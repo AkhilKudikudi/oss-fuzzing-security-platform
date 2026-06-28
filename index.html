@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<!--
+  FILE    : index.html
+  PURPOSE : Login page — Step 1 of 3.
+  MODULES USED:
+    css/styles.css → all visual styling
+    js/auth.js     → doLogin(), showMsg()
+  HOW IT WORKS:
+    User types email + password → clicks Sign In →
+    auth.js checks localStorage for matching user →
+    if found: saves session → goes to upload.html
+    if not found: shows red error message.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OSS Fuzzing — Login</title>
+
+  <!-- Google Fonts loaded from internet CDN.
+       Space Grotesk = clean modern font for text.
+       JetBrains Mono = code-style font for footer. -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Our shared CSS module — controls all visual styles -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="has-video-bg">
+
+<!-- Lock video background — loops continuously while on login page.
+     autoplay + muted + loop + playsinline = plays automatically on
+     all browsers without user needing to press play, and loops
+     forever once it reaches the end (matches "run in a loop" request). -->
+<div class="video-bg-wrap">
+  <video autoplay muted loop playsinline>
+    <source src="videos/lock-bg.mp4" type="video/mp4">
+  </video>
+</div>
+<div class="video-bg-overlay"></div>
+
+<div class="card">
+
+  <!-- Step indicator: 3 dots, first one active (Login step) -->
+  <div class="steps">
+    <div class="step-dot active" title="Step 1: Login"></div>
+    <div class="step-dot" title="Step 2: Upload File"></div>
+    <div class="step-dot" title="Step 3: Dashboard"></div>
+  </div>
+
+  <!-- Logo: green icon + project name -->
+  <div class="logo">
+    <div class="logo-icon">
+      <!-- SVG = Scalable Vector Graphic, drawn in code, sharp at any size -->
+      <svg viewBox="0 0 20 20">
+        <path d="M10 2L3 6v8l7 4 7-4V6L10 2zm0 2.2L15.5 7 10 9.8 4.5 7 10 4.2zM4 8.5l5.5 3.1v5L4 13.5v-5zm7.5 8.1v-5L17 8.5v5l-5.5 3.1z"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <h1>OSS Fuzzing</h1>
+      <p>Security Detection Platform</p>
+    </div>
+  </div>
+
+  <div class="heading">Welcome Back</div>
+  <div class="sub">Step 1 of 3 — Sign in to access the platform</div>
+
+  <!-- Error box: shown by auth.js showMsg('err',...) on bad login -->
+  <div class="err" id="errMsg"></div>
+  <!-- Success box: shown by auth.js showMsg('suc',...) on good login -->
+  <div class="suc" id="sucMsg"></div>
+
+  <!-- EMAIL INPUT
+       type="email" = browser validates @ format automatically.
+       autocomplete = browser can suggest saved emails. -->
+  <div class="fg">
+    <label for="email">Email Address</label>
+    <input type="email" id="email"
+           placeholder="Enter your registered email"
+           autocomplete="email">
+  </div>
+
+  <!-- PASSWORD INPUT
+       type="password" = hides typed characters as dots.
+       onkeydown: pressing Enter key triggers login (same as button). -->
+  <div class="fg">
+    <label for="pass">Password</label>
+    <input type="password" id="pass"
+           placeholder="Enter your password"
+           autocomplete="current-password"
+           onkeydown="if(event.key==='Enter') doLogin()">
+  </div>
+
+  <!-- Sign In button → calls doLogin() defined in auth.js -->
+  <button class="btn" onclick="doLogin()">Sign In →</button>
+
+  <!-- OR divider line -->
+  <div class="divider"><span>NEW USER?</span></div>
+
+  <!-- Link to register page -->
+  <div class="link-row">
+    Don't have an account?
+    <a href="register.html">Create New Account</a>
+  </div>
+
+  <!-- Student details -->
+  <div class="footer">
+    KUDIKUDI AKHIL · H.T. 104324862027<br>
+    2nd MCA IV Sem · UPG College (O.U.), Siddipet<br>
+    Guide: U. RAJENDER · HOD: V. CHANDRA SHEKHAR
+  </div>
+
+</div><!-- end .card -->
+
+<!-- Load auth module — provides doLogin(), showMsg() etc. -->
+<script src="js/auth.js"></script>
+
+<script>
+  /*
+    Auto-redirect: if already logged in, skip login page.
+    sessionStorage.getItem returns null if key doesn't exist,
+    meaning the user is NOT logged in — so we stay on this page.
+    If it returns a value, user IS logged in → go to upload.
+  */
+  if (sessionStorage.getItem('ossFuzzLoggedIn')) {
+    window.location.replace('upload.html');
+  }
+</script>
+
+</body>
+</html>

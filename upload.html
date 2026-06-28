@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<!--
+  FILE    : upload.html
+  PURPOSE : Step 2 — Upload URL file(s) before fuzzing.
+            User can upload ONE or MULTIPLE files.
+            Each file must contain only URLs, domains, emails.
+            After uploading, user clicks "Start Fuzzing Engine".
+  MODULES USED:
+    js/auth.js   → guardPage(), getLoggedInUser(), setTopbar(), doLogout()
+    js/upload.js → initUpload(), handleFiles(), validateRows(),
+                   renderFileList(), removeFile(), proceedToDashboard()
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSS Fuzzing — Upload Targets</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ── GLOBAL RESET & VARIABLES ─────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#07090f;--bg2:#0b0f1c;--bg3:#111827;
+  --green:#00e676;--green2:#00c853;
+  --red:#ff1744;--blue:#2979ff;--yellow:#ffd600;
+  --text:#dde8f5;--text2:#7a90ab;--text3:#3d5068;
+  --border:#141f30;--border2:#1e2f47;
+  --card:#0e1422;--card2:#12192a;
+}
+body{
+  background:var(--bg);color:var(--text);
+  font-family:'Space Grotesk',sans-serif;
+  min-height:100vh;display:flex;flex-direction:column;
+}
+
+/* ══════════════════════════════════════════════════════════
+   BACKGROUND VIDEO — fills the ENTIRE page edge-to-edge,
+   the same crop/zoom "cover" style as the login page video.
+   Sits behind the topbar, steps bar, and upload/rules cards,
+   which all get position:relative + z-index so they render
+   on top of it and stay fully readable.
+
+   Sized in pixels by JavaScript (syncVideoBgHeight() in
+   upload.js) to match the page's true full scrollable height,
+   not just one screen — so it never cuts off to black further
+   down the page. position:absolute (not fixed) makes it scroll
+   together with the page content, exactly like everything else
+   on this page. */
+.video-bg-wrap{
+  position:absolute; top:0; left:0;
+  width:100%; height:100%; z-index:0;
+  overflow:hidden; background:#07090f;
+}
+.video-bg-wrap video{
+  position:absolute; top:50%; left:50%;
+  min-width:100%; min-height:100%;
+  width:auto; height:auto;
+  transform:translate(-50%,-50%);
+  object-fit:cover;
+}
+.video-bg-overlay{
+  position:absolute; top:0; left:0;
+  width:100%; height:100%; z-index:1;
+  background:rgba(7,9,15,0.62);
+}
+body.has-video-bg .topbar,
+body.has-video-bg .steps-bar,
+body.has-video-bg .main{
+  position:relative; z-index:2;
+}
+
+/* ── TOPBAR ───────────────────────────────────────────────── */
+.topbar{
+  height:54px;background:var(--bg2);border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0;
+}
+.topbar-title{font-size:14px;font-weight:700;color:var(--text)}
+.topbar-sub{font-size:10px;color:var(--text3);margin-top:1px}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+/* User chip shows logged-in user's name */
+.user-chip{
+  display:flex;align-items:center;gap:7px;padding:5px 12px;
+  border-radius:20px;background:rgba(0,230,118,.07);
+  border:1px solid rgba(0,230,118,.15);font-size:12px;font-weight:600;color:#00e676;
+}
+/* Avatar circle shows user's first initial */
+.user-avatar{
+  width:22px;height:22px;border-radius:50%;background:#00e676;
+  color:#000;font-size:11px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;
+}
+.logout-btn{
+  display:flex;align-items:center;gap:6px;padding:6px 14px;
+  border-radius:8px;border:1px solid #1e2f47;background:transparent;
+  color:#7a90ab;font-size:12px;font-weight:600;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;transition:all .18s;
+}
+.logout-btn:hover{background:rgba(255,23,68,.1);border-color:rgba(255,23,68,.3);color:#ff5252;}
+
+/* ── STEP PROGRESS BAR ────────────────────────────────────── */
+.steps-bar{
+  background:var(--bg2);border-bottom:1px solid var(--border);
+  padding:12px 24px;display:flex;gap:0;align-items:center;
+}
+.step-item{
+  display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;
+}
+.step-num{
+  width:24px;height:24px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:11px;font-weight:700;
+  background:var(--bg3);color:var(--text3);border:1px solid var(--border2);
+}
+.step-num.done{background:var(--green2);color:#000;border-color:var(--green2);}
+.step-num.active{background:var(--blue);color:#fff;border-color:var(--blue);}
+.step-lbl{color:var(--text3)}
+.step-lbl.done{color:var(--green)}
+.step-lbl.active{color:var(--text)}
+.step-sep{flex:1;height:1px;background:var(--border);margin:0 12px;}
+
+/* ── MAIN CONTENT ─────────────────────────────────────────── */
+.main{
+  flex:1;display:flex;align-items:flex-start;justify-content:center;
+  padding:32px 20px;
+}
+.container{width:100%;max-width:720px;display:flex;flex-direction:column;gap:20px}
+
+/* ── CARD ─────────────────────────────────────────────────── */
+.card{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;padding:24px;
+}
+.card-title{
+  font-size:11px;font-weight:700;letter-spacing:.9px;
+  text-transform:uppercase;color:var(--text3);margin-bottom:16px;
+}
+
+/* ── UPLOAD ZONE ──────────────────────────────────────────── */
+.upload-zone{
+  border:2px dashed var(--border2);border-radius:12px;
+  padding:36px 24px;text-align:center;cursor:pointer;
+  transition:all .2s;background:var(--bg2);position:relative;
+}
+.upload-zone:hover,.upload-zone.drag-over{
+  border-color:var(--blue);background:rgba(41,121,255,.05);
+}
+.upload-zone.valid{border-color:var(--green);background:rgba(0,230,118,.04);}
+.upload-zone.invalid{border-color:var(--red);background:rgba(255,23,68,.04);}
+
+/* Hidden actual file input — we show only the styled zone */
+.upload-zone input[type=file]{
+  position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;
+}
+.upload-icon{font-size:36px;margin-bottom:10px}
+.upload-title{font-size:15px;font-weight:600;color:var(--text);margin-bottom:6px}
+.upload-hint{font-size:12px;color:var(--text3);line-height:1.6}
+
+/* ── FILE LIST ────────────────────────────────────────────── */
+/* Container for the list of uploaded files */
+#fileListContainer{
+  background:var(--bg2);border:1px solid var(--border2);
+  border-radius:10px;overflow:hidden;display:none;
+}
+.file-list-header{
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  font-size:10px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:var(--text3);
+  display:flex;align-items:center;justify-content:space-between;
+}
+
+/* Each uploaded file row */
+.file-row{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:12px 16px;border-bottom:1px solid var(--border);
+  transition:background .15s;
+}
+.file-row:last-child{border-bottom:none}
+.file-row:hover{background:var(--bg3)}
+.file-row-info{display:flex;align-items:center;gap:10px}
+.file-row-icon{font-size:18px}
+.file-row-name{font-size:13px;font-weight:600;color:var(--text)}
+.file-row-meta{font-size:11px;color:var(--text3);margin-top:2px;font-family:'JetBrains Mono',monospace}
+
+/* Red remove button for each file */
+.file-row-remove{
+  background:rgba(255,23,68,.1);border:1px solid rgba(255,23,68,.2);
+  color:#ff5252;padding:4px 10px;border-radius:6px;font-size:11px;
+  font-weight:600;cursor:pointer;transition:all .15s;
+  font-family:'Space Grotesk',sans-serif;
+}
+.file-row-remove:hover{background:rgba(255,23,68,.22);border-color:#ff1744;}
+
+/* Total URL count row at bottom of file list */
+.file-list-total{
+  padding:10px 16px;font-size:12px;color:var(--text2);
+  background:rgba(0,230,118,.04);border-top:1px solid var(--border);
+}
+
+/* ── MESSAGES ─────────────────────────────────────────────── */
+.err-msg{
+  background:rgba(255,23,68,.08);border:1px solid rgba(255,23,68,.2);
+  border-radius:8px;padding:14px 18px;font-size:16px;
+  color:#ff5252;display:none;line-height:1.6;
+}
+.suc-msg{
+  background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.2);
+  border-radius:8px;padding:14px 18px;font-size:16px;
+  color:#00e676;display:none;line-height:1.6;
+}
+
+/* ── RULES CARD ───────────────────────────────────────────── */
+.rules-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.rule-item{
+  background:var(--bg2);border:1px solid var(--border);
+  border-radius:8px;padding:12px;
+}
+.rule-title{font-size:11px;font-weight:700;color:var(--text);margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.rule-body{font-size:11px;color:var(--text3);line-height:1.6;font-family:'JetBrains Mono',monospace}
+
+/* ── PROCEED BUTTON ───────────────────────────────────────── */
+.proceed-btn{
+  display:none;width:100%;padding:14px;border-radius:10px;
+  background:var(--green);color:#000;border:none;font-size:14px;
+  font-weight:700;cursor:pointer;transition:all .18s;
+  font-family:'Space Grotesk',sans-serif;letter-spacing:.3px;
+}
+.proceed-btn:hover{background:var(--green2);transform:translateY(-1px);}
+
+/* ── SAMPLE FILE HINT ─────────────────────────────────────── */
+.sample-hint{
+  background:rgba(41,121,255,.06);border:1px solid rgba(41,121,255,.15);
+  border-radius:8px;padding:12px 16px;font-size:12px;color:#5b9fff;
+  line-height:1.6;
+}
+</style>
+
+  <!--
+    Load auth.js FIRST — it defines guardPage(), getLoggedInUser(),
+    setTopbar(), doLogout() which upload.js and this page use.
+  -->
+  <script src="js/auth.js"></script>
+
+  <!--
+    Load upload.js AFTER auth.js — it defines initUpload(),
+    handleFiles(), validateRows(), renderFileList(), etc.
+  -->
+  <script src="js/upload.js"></script>
+
+<!-- SheetJS — reads Excel (.xlsx/.xls) files in the browser.
+     Needed because Excel files are binary, not plain text —
+     this library extracts the cell data for us to validate. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body class="has-video-bg">
+
+<!-- Numbers video background — plays while user is on the
+     Upload page. Stops automatically the moment they navigate
+     to dashboard.html (page unload), exactly like the login video. -->
+<div class="video-bg-wrap">
+  <video autoplay muted loop playsinline>
+    <source src="videos/numbers-bg.mp4" type="video/mp4">
+  </video>
+</div>
+<div class="video-bg-overlay"></div>
+
+<!-- ── TOPBAR ──────────────────────────────────────────────── -->
+<div class="topbar">
+  <div>
+    <div class="topbar-title">⬡ OSS Vulnerability Detection Platform</div>
+    <div class="topbar-sub">KUDIKUDI AKHIL · 2ND MCA IV SEM · H.T.: 104324862027 · UPG COLLEGE SIDDIPET</div>
+  </div>
+  <div class="topbar-right">
+    <!-- userChip: filled by setTopbar() from auth.js -->
+    <div class="user-chip" id="userChip">
+      <div class="user-avatar" id="userInitial">?</div>
+      <span id="userGreeting">Guest</span>
+    </div>
+    <!-- Logout button: calls doLogout() from auth.js -->
+    <button class="logout-btn" onclick="doLogout()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+        <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+        <polyline points="16 17 21 12 16 7"/>
+        <line x1="21" y1="12" x2="9" y2="12"/>
+      </svg>
+      Logout
+    </button>
+  </div>
+</div>
+
+<!-- ── STEP PROGRESS BAR ───────────────────────────────────── -->
+<!-- Shows the user which step of the process they are on -->
+<div class="steps-bar">
+  <!-- Step 1: Login - already done (green checkmark) -->
+  <div class="step-item">
+    <div class="step-num done">✓</div>
+    <span class="step-lbl done">Login</span>
+  </div>
+  <div class="step-sep"></div>
+  <!-- Step 2: Upload - current step (blue = active) -->
+  <div class="step-item">
+    <div class="step-num active">2</div>
+    <span class="step-lbl active">Upload URL File</span>
+  </div>
+  <div class="step-sep"></div>
+  <!-- Step 3: Dashboard - next step (grey = not yet) -->
+  <div class="step-item">
+    <div class="step-num">3</div>
+    <span class="step-lbl">Fuzzing Dashboard</span>
+  </div>
+</div>
+
+<!-- ── MAIN CONTENT ─────────────────────────────────────────── -->
+<div class="main">
+  <div class="container">
+
+    <!-- PAGE HEADER -->
+    <div>
+      <h1 style="font-size:22px;font-weight:700;color:var(--text);margin-bottom:6px">
+        Upload Target File(s)
+      </h1>
+      <p style="font-size:13px;color:var(--text2);line-height:1.6">
+        Upload one or more files containing URLs, website links, or email IDs.
+        The fuzzing engine will send thousands of random test inputs to each target.
+        You can add multiple files — they will be combined automatically.
+      </p>
+    </div>
+
+    <!-- UPLOAD ZONE CARD -->
+    <div class="card">
+      <div class="card-title">Choose / Drop File</div>
+
+      <!--
+        The upload zone is a clickable box.
+        The hidden input[type=file] inside it opens the file dialog.
+        onchange calls handleFiles() from upload.js when user picks a file.
+      -->
+      <div class="upload-zone" id="uploadZone">
+        <input type="file"
+               accept=".txt,.csv,.json,.xml,.xlsx,.xls"
+               multiple onchange="handleFiles(this.files)"
+               title="Click to choose a URL file">
+        <div class="upload-icon">📁</div>
+        <div class="upload-title">Click to choose file or drag &amp; drop here</div>
+        <div class="upload-hint">
+          File must contain URLs, websites, domains, or emails only<br>
+          Accepted formats: .csv · .xlsx · .xls · .json · .xml · .txt
+        </div>
+      </div>
+
+      <!-- Error and success message boxes -->
+      <div class="err-msg" id="errMsg"></div>
+      <div class="suc-msg" id="sucMsg"></div>
+    </div>
+
+    <!-- FILE LIST CARD — shows all uploaded files with remove buttons -->
+    <div class="card" id="fileListContainer" style="display:none;padding:0;overflow:hidden">
+      <div class="file-list-header">
+        <span>📋 Uploaded Files</span>
+        <!--
+          "Add More Files" button — opens file dialog to add another file.
+          Calls the upload zone's file input click programmatically.
+        -->
+        <button onclick="var inp=document.querySelector('.upload-zone input[type=file]');inp.value='';inp.click();"
+                style="background:rgba(41,121,255,.1);border:1px solid rgba(41,121,255,.2);
+                       color:#5b9fff;padding:4px 12px;border-radius:6px;font-size:11px;
+                       font-weight:600;cursor:pointer;font-family:'Space Grotesk',sans-serif">
+          + Add More Files
+        </button>
+      </div>
+      <!-- File rows are rendered here by renderFileList() in upload.js -->
+      <div id="fileList">
+        <div style="color:var(--text3);text-align:center;padding:16px;font-size:12px">No files added yet</div>
+      </div>
+    </div>
+
+    <!-- VALIDATION RULES CARD — explains what files are accepted -->
+    <div class="card">
+      <div class="card-title">File Validation Rules</div>
+      <div class="rules-grid">
+
+        <!-- ACCEPTED examples -->
+        <div class="rule-item" style="border-color:rgba(0,230,118,.2)">
+          <div class="rule-title" style="color:var(--green)">✓ Accepted</div>
+          <div class="rule-body">
+            https://example.com<br>
+            www.github.com/openssl<br>
+            api.company-name.ac.in<br>
+            yhjbhasg-hsbjbsy.ac<br>
+            site.gov.in/path?q=1<br>
+            name@domain.com<br>
+            full.name@company.gov<br>
+            first.last@domain.ac
+          </div>
+        </div>
+
+        <!-- REJECTED examples -->
+        <div class="rule-item" style="border-color:rgba(255,23,68,.2)">
+          <div class="rule-title" style="color:var(--red)">✗ Rejected</div>
+          <div class="rule-body">
+            Kudikudi Akhil  ← plain name<br>
+            9640972107  ← phone number<br>
+            01-01-2000  ← date of birth<br>
+            Hello World  ← plain text<br>
+            @domain.com  ← no name before @<br>
+            (empty file)  ← no content<br>
+            123  ← just a number<br>
+            random text here
+          </div>
+        </div>
+      </div>
+
+      <!-- Hint about the sample file included in the project -->
+      <div class="sample-hint" style="margin-top:14px">
+        💡 <strong>Tip:</strong> A ready-made <code>sample_urls.txt</code> file is included in your project folder.
+        Open it to see the correct format, or use it directly to test the project.
+        You can also create your own .txt file with one URL per line.
+      </div>
+    </div>
+
+    <!--
+      PROCEED BUTTON — shown only after at least one valid file is uploaded.
+      Calls proceedToDashboard() from upload.js.
+      proceedToDashboard() saves URLs to sessionStorage and navigates to dashboard.
+    -->
+    <button class="proceed-btn" id="proceedBtn" onclick="proceedToDashboard()">
+      ▶ Start Fuzzing Engine →
+    </button>
+
+  </div>
+</div>
+
+<script>
+/*
+  Page initialization script.
+  window.onload fires after all HTML and scripts are fully loaded.
+  We call initUpload() from upload.js which sets up:
+    - Auth guard (redirect to login if not logged in)
+    - Topbar user name
+    - Drag-and-drop events on the upload zone
+*/
+window.onload = function() {
+  initUpload(); /* Defined in js/upload.js */
+};
+</script>
+
+</body>
+</html>

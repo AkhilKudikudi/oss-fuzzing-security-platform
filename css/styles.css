@@ -1,0 +1,278 @@
+/*
+  ============================================================
+  FILE    : css/styles.css
+  PURPOSE : Shared styles used by index.html, register.html,
+            and upload.html. Dashboard uses its own styles.
+  MODULE  : CSS — Controls all visual appearance.
+
+  WHY SEPARATE CSS?
+  One file shared by 3 pages. Change a colour here and ALL
+  pages update instantly. This is the DRY principle:
+  "Don't Repeat Yourself".
+
+  HOW TO EXPLAIN TO HOD:
+  "Sir, CSS stands for Cascading Style Sheets. This module
+  controls how the HTML looks — colours, layout, spacing.
+  I separated it so design changes don't touch logic files."
+  ============================================================
+*/
+
+/* ── CSS VARIABLES ──────────────────────────────────────────
+   Define colours once here, use them everywhere below.
+   To change the green theme: only edit --green value here. */
+:root {
+  --bg      : #07090f;  /* Dark navy — main background         */
+  --bg2     : #0b0f1c;  /* Slightly lighter — card background  */
+  --bg3     : #111827;  /* Input field background              */
+  --bg4     : #1a2235;  /* Hover / tag background              */
+  --green   : #00e676;  /* Bright green — primary accent       */
+  --green2  : #00c853;  /* Darker green — used on hover        */
+  --red     : #ff1744;  /* Red — for error messages            */
+  --text    : #dde8f5;  /* Main text — light blue-white        */
+  --text2   : #7a90ab;  /* Secondary text — dimmer             */
+  --text3   : #3d5068;  /* Hint text — dimmest                 */
+  --border  : #141f30;  /* Separator line colour               */
+  --border2 : #1e2f47;  /* Card and input border               */
+}
+
+/* ── RESET ──────────────────────────────────────────────────
+   Browsers add margins/padding by default. We remove all of
+   it so we control every pixel ourselves.
+   box-sizing:border-box = padding is INSIDE the width. */
+* { margin:0; padding:0; box-sizing:border-box; }
+
+/* ── BODY ───────────────────────────────────────────────────
+   Full-screen dark page. Flexbox centres the card.
+   100vh = 100% of visible screen height. */
+body {
+  background:var(--bg); color:var(--text);
+  font-family:'Space Grotesk',sans-serif;
+  min-height:100vh; display:flex;
+  align-items:center; justify-content:center;
+  padding:30px 20px; position:relative; overflow-x:hidden;
+}
+
+/* ── DOT GRID BACKGROUND ────────────────────────────────────
+   ::before creates a fake layer BEHIND all page content.
+   Shows a repeating dot pattern for a "hacker/tech" feel.
+   pointer-events:none = clicks pass through this layer. */
+body::before {
+  content:''; position:absolute; top:0; left:0;
+  width:100%; height:100%;
+  background-image:radial-gradient(circle,#1a2235 1px,transparent 1px);
+  background-size:30px 30px; opacity:0.4;
+  pointer-events:none; z-index:0;
+}
+
+/* ── CARD ───────────────────────────────────────────────────
+   The main dark box visible in the centre of the screen.
+   z-index:1 places it above the dot background layer. */
+.card {
+  background:var(--bg2); border:1px solid var(--border2);
+  border-radius:20px; padding:44px 40px;
+  width:100%; max-width:480px;
+  position:relative; z-index:1; margin:auto;
+  box-shadow:0 0 60px rgba(0,230,118,0.07),0 20px 60px rgba(0,0,0,0.5);
+}
+
+/* ── STEP DOTS ───────────────────────────────────────────────
+   3 small circles at the top of each card showing progress.
+   Dot 1=Login, Dot 2=Upload File, Dot 3=Dashboard. */
+.steps { display:flex; justify-content:center; gap:6px; margin-bottom:24px; }
+.step-dot { width:8px; height:8px; border-radius:50%; background:var(--border2); }
+.step-dot.active { background:var(--green); }  /* Current step */
+.step-dot.done   { background:#00c85388; }     /* Completed step */
+
+/* ── LOGO ───────────────────────────────────────────────────
+   Green square icon + project name, centred at card top. */
+.logo { display:flex; align-items:center; justify-content:center; gap:12px; margin-bottom:28px; }
+.logo-icon {
+  width:48px; height:48px; border-radius:14px; flex-shrink:0;
+  background:linear-gradient(135deg,#00c853,#00e676);
+  display:flex; align-items:center; justify-content:center;
+}
+.logo-icon svg { width:24px; height:24px; fill:#000; }
+.logo-text h1  { font-size:18px; font-weight:700; }
+.logo-text p   { font-size:11px; color:var(--text3); margin-top:2px; }
+
+/* ── HEADINGS ───────────────────────────────────────────────*/
+.heading { font-size:22px; font-weight:700; text-align:center; margin-bottom:6px; }
+.sub     { font-size:12px; color:var(--text2); text-align:center; margin-bottom:26px; line-height:1.6; }
+
+/* ── FORM GROUP — one label above one input field ────────────*/
+.fg { margin-bottom:18px; }
+.fg label { display:block; font-size:12px; font-weight:600; color:var(--text2); margin-bottom:7px; }
+.fg input {
+  width:100%; background:var(--bg3); border:1px solid var(--border2);
+  border-radius:10px; padding:12px 16px; color:var(--text);
+  font-size:14px; font-family:'Space Grotesk',sans-serif;
+  transition:border-color .2s,box-shadow .2s; outline:none;
+}
+/* Green glow shown when user clicks on (focuses) an input */
+.fg input:focus { border-color:var(--green); box-shadow:0 0 0 3px rgba(0,230,118,0.12); }
+
+/* Two-column grid for First Name and Last Name side by side */
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
+.form-row .fg { margin-bottom:0; }
+
+/* Small helper text shown below an input */
+.hint { font-size:10px; color:var(--text3); margin-top:6px; }
+
+/* ── PASSWORD STRENGTH BAR ───────────────────────────────────
+   Thin bar below password field. JS changes its width and
+   colour depending on password strength (red→yellow→green). */
+.str-wrap { height:4px; background:var(--bg4); border-radius:2px; margin-top:8px; overflow:hidden; }
+.str-fill { height:100%; border-radius:2px; width:0%; transition:width .3s,background .3s; }
+.str-lbl  { font-size:10px; color:var(--text3); margin-top:5px; }
+
+/* ── REQUIREMENT PILLS ───────────────────────────────────────
+   Small tags showing password rules. JS adds class "met"
+   to turn them green when each rule is satisfied. */
+.req-list    { list-style:none; font-size:11px; color:var(--text3); margin-top:8px; display:flex; flex-wrap:wrap; gap:6px; }
+.req-list li { padding:3px 8px; border-radius:4px; background:var(--bg4); transition:background .2s,color .2s; }
+.req-list li.met { background:rgba(0,230,118,0.12); color:var(--green); }
+
+/* ── TERMS CHECKBOX ──────────────────────────────────────────*/
+.cb-row { display:flex; align-items:flex-start; gap:10px; margin-bottom:20px; }
+.cb-row input[type="checkbox"] { width:16px; height:16px; margin-top:2px; accent-color:var(--green); flex-shrink:0; cursor:pointer; }
+.cb-row label { font-size:12px; color:var(--text2); cursor:pointer; }
+
+/* ── PRIMARY BUTTON ──────────────────────────────────────────
+   Green action button. Lifts 1px on hover (translateY(-1px))
+   to give a clickable feel. Drops back on click (:active). */
+.btn {
+  width:100%; background:var(--green); color:#000;
+  border:none; border-radius:10px; padding:13px;
+  font-size:14px; font-weight:700; font-family:'Space Grotesk',sans-serif;
+  cursor:pointer; transition:background .18s,transform .1s; margin-top:6px;
+}
+.btn:hover  { background:var(--green2); transform:translateY(-1px); }
+.btn:active { transform:translateY(0); }
+
+/* ── MESSAGE BOXES ───────────────────────────────────────────
+   display:none hides them by default.
+   JS sets display:'block' to show on error or success. */
+.err {
+  background:rgba(255,23,68,0.1); border:1px solid rgba(255,23,68,0.3);
+  border-radius:8px; padding:10px 14px; font-size:12px;
+  color:#ff5252; margin-bottom:16px; display:none;
+}
+.suc {
+  background:rgba(0,230,118,0.1); border:1px solid rgba(0,230,118,0.3);
+  border-radius:8px; padding:10px 14px; font-size:12px;
+  color:var(--green); margin-bottom:16px; display:none;
+}
+
+/* ── DIVIDER — "OR" line ─────────────────────────────────────
+   flex:1 on ::before and ::after makes both lines grow equally,
+   centering the "OR" text between them. */
+.divider { display:flex; align-items:center; gap:12px; margin:22px 0; }
+.divider::before,.divider::after { content:''; flex:1; height:1px; background:var(--border2); }
+.divider span { font-size:11px; color:var(--text3); font-weight:600; }
+
+/* ── NAVIGATION LINK ─────────────────────────────────────────*/
+.link-row   { text-align:center; font-size:13px; color:var(--text2); }
+.link-row a { color:var(--green); text-decoration:none; font-weight:600; }
+.link-row a:hover { color:var(--green2); text-decoration:underline; }
+
+/* ── FOOTER — student details at bottom of every card ────────*/
+.footer {
+  margin-top:24px; padding-top:16px; border-top:1px solid var(--border);
+  text-align:center; font-size:10px; color:var(--text3);
+  line-height:1.7; font-family:'JetBrains Mono',monospace;
+}
+
+/* ── TOPBAR (upload page) ────────────────────────────────────
+   position:fixed keeps it at screen top even when scrolling.
+   backdrop-filter:blur creates a frosted-glass effect. */
+.topbar {
+  position:fixed; top:0; left:0; right:0;
+  display:flex; align-items:center; justify-content:flex-end;
+  padding:12px 24px; z-index:100;
+  background:rgba(7,9,15,0.85); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border);
+}
+.user-chip {
+  display:flex; align-items:center; gap:7px; padding:5px 12px;
+  border-radius:20px; background:rgba(0,230,118,0.07);
+  border:1px solid rgba(0,230,118,0.15); font-size:12px; font-weight:600; color:var(--green);
+}
+/* Circle avatar showing first letter of the logged-in user's name */
+.user-avatar {
+  width:22px; height:22px; border-radius:50%;
+  background:var(--green); color:#000; font-size:11px; font-weight:700;
+  display:flex; align-items:center; justify-content:center;
+}
+.logout-btn {
+  margin-left:10px; padding:6px 14px; border-radius:8px;
+  border:1px solid var(--border2); background:transparent; color:var(--text2);
+  font-size:12px; font-weight:600; font-family:'Space Grotesk',sans-serif;
+  cursor:pointer; transition:all .18s;
+}
+.logout-btn:hover { background:rgba(255,23,68,0.1); border-color:rgba(255,23,68,0.3); color:#ff5252; }
+
+/* Pushes page content below the fixed topbar so it isn't hidden */
+.page-wrap { padding-top:70px; width:100%; display:flex; justify-content:center; }
+
+/* ══════════════════════════════════════════════════════════
+   LOGIN / REGISTER PAGE — VIDEO BACKGROUND
+   The lock video plays full-screen behind the login card.
+   It loops continuously while the user is on this page.
+   The login card itself keeps its exact original position —
+   centered on screen — only a video layer is added behind it.
+
+   IMPORTANT — fixed vs absolute:
+   index.html / register.html are SHORT pages (one card,
+   fits in one screen) — position:fixed works perfectly there.
+
+   upload.html is a TALL, SCROLLABLE page (topbar + steps +
+   header + upload card + rules card). A position:fixed video
+   only covers the visible viewport, NOT the full scrollable
+   page — so once the page is taller than one screen, the video
+   only shows behind the top section and cuts off to solid black
+   further down. To fix this, upload.html uses position:absolute
+   on a wrapper sized to 100% of the actual page height instead,
+   so the video extends behind the ENTIRE page, including parts
+   you only see after scrolling.
+   ══════════════════════════════════════════════════════════ */
+.video-bg-wrap {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%; z-index: 0;
+  overflow: hidden; background: #07090f;
+}
+.video-bg-wrap video {
+  position: absolute; top: 50%; left: 50%;
+  min-width: 100%; min-height: 100%;
+  width: auto; height: auto;
+  transform: translate(-50%, -50%);
+  object-fit: cover;
+}
+/* Dark overlay so the login/upload card text stays readable
+   on top of the moving video */
+.video-bg-overlay {
+  position: fixed; top: 0; left: 0;
+  width: 100%; height: 100%; z-index: 1;
+  background: rgba(7,9,15,0.62);
+}
+
+/* NOTE: upload.html does NOT link this stylesheet — it has its
+   own self-contained <style> block in the page itself. The video
+   background rules for the Upload page live there instead (see
+   upload.html's inline <style> for .video-bg-wrap etc). These
+   rules below only apply to index.html and register.html, which
+   DO link this stylesheet. */
+
+/* The card / topbar / steps-bar / page content all sit above
+   both video layers so nothing is hidden behind the moving video.
+   .main is the outer content wrapper used on upload.html;
+   .card is the centered box used on index.html / register.html. */
+body.has-video-bg .card,
+body.has-video-bg .main,
+body.has-video-bg .topbar,
+body.has-video-bg .steps-bar {
+  position: relative;
+  z-index: 2;
+}
+body.has-video-bg {
+  background: #07090f;
+}

@@ -1,0 +1,1182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>OSS Fuzzing — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/upload.js"></script>
+<style>
+/* ── RESET & ROOT VARIABLES ──────────────────────────────── */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#07090f;--bg2:#0b0f1c;--bg3:#111827;--bg4:#1a2235;--bg5:#1f2a40;
+  --green:#00e676;--green2:#00c853;--green3:rgba(0,230,118,.12);
+  --red:#ff1744;--orange:#ff6d00;--yellow:#ffd600;
+  --blue:#2979ff;--cyan:#00e5ff;--purple:#d500f9;
+  --text:#dde8f5;--text2:#7a90ab;--text3:#3d5068;
+  --border:#141f30;--border2:#1e2f47;--border3:#263852;
+  --card:#0e1422;--card2:#12192a;
+  --sidebar-w:260px;
+}
+body{background:var(--bg);color:var(--text);font-family:'Space Grotesk',sans-serif;
+     display:flex;height:100vh;overflow:hidden;font-size:13px}
+
+/* ── SIDEBAR ─────────────────────────────────────────────── */
+#sidebar{width:var(--sidebar-w);min-width:var(--sidebar-w);background:var(--bg2);
+  border-right:1px solid var(--border);display:flex;flex-direction:column;
+  overflow-y:auto;overflow-x:hidden;flex-shrink:0}
+#sidebar::-webkit-scrollbar{width:3px}
+#sidebar::-webkit-scrollbar-thumb{background:var(--border2)}
+
+.sb-head{padding:14px 16px;border-bottom:1px solid var(--border);flex-shrink:0}
+.sb-logo-row{display:flex;align-items:center;gap:10px}
+.sb-logo{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,#00c853,#00e676);
+  display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sb-logo svg{width:18px;height:18px;fill:#000}
+.sb-brand{font-size:13px;font-weight:700;color:var(--text)}
+.sb-sub{font-size:9px;color:var(--text3);margin-top:2px}
+
+/* NAV BUTTONS */
+.sb-nav{padding:8px 0}
+.sb-section{font-size:9px;font-weight:700;letter-spacing:1.2px;color:var(--text3);
+  padding:10px 16px 4px;text-transform:uppercase}
+.nav-btn{display:flex;align-items:center;gap:10px;padding:0 16px;height:40px;
+  cursor:pointer;border:none;background:transparent;color:var(--text2);
+  width:100%;text-align:left;transition:all .16s;position:relative;font-family:'Space Grotesk',sans-serif}
+.nav-btn:hover{background:var(--bg3);color:var(--text)}
+.nav-btn.active{background:var(--green3);color:var(--green)}
+.nav-btn.active::before{content:'';position:absolute;left:0;top:8px;bottom:8px;
+  width:3px;background:var(--green);border-radius:0 3px 3px 0}
+.nav-btn svg{width:16px;height:16px;flex-shrink:0}
+.nav-lbl{font-size:12px;font-weight:500}
+.nav-badge{margin-left:auto;min-width:20px;height:18px;border-radius:9px;
+  background:rgba(255,23,68,.2);color:#ff5252;font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;padding:0 5px}
+.sb-divider{height:1px;background:var(--border);margin:6px 10px}
+
+/* SIDEBAR LIVE PANEL */
+.sb-live-section{padding:12px 14px;flex:1}
+.sb-panel-title{font-size:9px;font-weight:700;letter-spacing:1px;color:var(--text3);
+  text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.sb-dot{width:6px;height:6px;border-radius:50%;background:var(--green);animation:pulse 1.4s infinite}
+.sb-dot.idle{background:var(--text3);animation:none}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+.sb-stat-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.sb-stat-lbl{font-size:10px;color:var(--text2)}
+.sb-stat-val{font-size:13px;font-weight:700;font-family:'JetBrains Mono',monospace}
+
+.sb-bar-row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.sb-bar-lbl{font-size:9px;color:var(--text2);width:58px;flex-shrink:0}
+.sb-bar-track{flex:1;height:5px;background:var(--bg4);border-radius:3px;overflow:hidden}
+.sb-bar-fill{height:100%;border-radius:3px;transition:width .5s}
+.sb-bar-pct{font-size:9px;font-weight:700;min-width:26px;text-align:right;font-family:'JetBrains Mono',monospace}
+
+/* Sidebar chart containers */
+.sb-chart-title{font-size:9px;color:var(--text3);margin:10px 0 4px;text-transform:uppercase;letter-spacing:.8px}
+.sb-chart-box{position:relative;width:100%}
+
+/* Pipeline in sidebar */
+.sb-pipe-step{display:flex;align-items:flex-start;gap:8px;padding:3px 0}
+.sb-pipe-dot-col{display:flex;flex-direction:column;align-items:center}
+.sb-pipe-dot{width:10px;height:10px;border-radius:50%;border:2px solid var(--border3);
+  background:var(--card);flex-shrink:0;margin-top:2px;transition:all .3s}
+.sb-pipe-dot.done{border-color:var(--green);background:var(--green)}
+.sb-pipe-dot.active{border-color:var(--cyan);background:var(--cyan);box-shadow:0 0 8px rgba(0,229,255,.6)}
+.sb-pipe-line{width:2px;flex:1;min-height:14px;background:var(--border);transition:background .3s}
+.sb-pipe-line.done{background:var(--green)}
+.sb-pipe-text{font-size:10px;color:var(--text2);padding-bottom:6px;transition:color .3s}
+.sb-pipe-text.active{color:var(--cyan);font-weight:600}
+.sb-pipe-text.done{color:var(--green)}
+.sb-pipe-name{font-weight:600;font-size:10px}
+.sb-pipe-sub{font-size:9px;color:var(--text3)}
+
+/* ── MAIN AREA ───────────────────────────────────────────── */
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+.topbar{height:52px;border-bottom:1px solid var(--border);display:flex;
+  align-items:center;padding:0 20px;gap:12px;background:var(--bg2);flex-shrink:0}
+.topbar-title{font-size:13px;font-weight:700}
+.topbar-sub{font-size:10px;color:var(--text3)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+
+.live-badge{display:flex;align-items:center;gap:6px;padding:4px 12px;border-radius:20px;
+  font-size:11px;font-weight:600;background:rgba(0,230,118,.08);
+  border:1px solid rgba(0,230,118,.2);color:var(--green)}
+.live-badge.idle{background:rgba(61,80,104,.08);border-color:var(--border2);color:var(--text3)}
+.live-badge .dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1.4s infinite}
+.live-badge.idle .dot{animation:none}
+
+.user-chip{display:flex;align-items:center;gap:7px;padding:4px 12px;border-radius:20px;
+  background:rgba(0,230,118,.07);border:1px solid rgba(0,230,118,.15);
+  font-size:12px;font-weight:600;color:#00e676}
+.user-avatar{width:22px;height:22px;border-radius:50%;background:#00e676;color:#000;
+  font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center}
+.file-chip{display:flex;align-items:center;gap:6px;padding:4px 10px;border-radius:20px;
+  background:rgba(41,121,255,.08);border:1px solid rgba(41,121,255,.2);
+  font-size:11px;color:#5b9fff;font-family:'JetBrains Mono',monospace;max-width:180px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none}
+
+.logout-btn{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:8px;
+  border:1px solid var(--border2);background:transparent;color:var(--text2);
+  font-size:12px;font-weight:600;font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:all .18s}
+.logout-btn:hover{background:rgba(255,23,68,.1);border-color:rgba(255,23,68,.3);color:#ff5252}
+
+/* ── TAB SYSTEM ──────────────────────────────────────────── */
+.content-area{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.content-area::-webkit-scrollbar{width:5px}
+.content-area::-webkit-scrollbar-thumb{background:var(--border2);border-radius:3px}
+.tab-pane{display:none;flex-direction:column;gap:16px}
+.tab-pane.active{display:flex}
+
+/* ── CARDS ───────────────────────────────────────────────── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px}
+.card-title{font-size:10px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
+  color:var(--text3);margin-bottom:14px}
+.cols-4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.cols-3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.cols-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* STAT CARDS */
+.stat{background:var(--card2);border:1px solid var(--border);border-radius:10px;
+  padding:14px;position:relative;overflow:hidden}
+.stat::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--border)}
+.stat.g::after{background:var(--green)}.stat.r::after{background:var(--red)}
+.stat.o::after{background:var(--orange)}.stat.b::after{background:var(--blue)}
+.stat-val{font-size:28px;font-weight:700;font-family:'JetBrains Mono',monospace;margin-bottom:4px}
+.stat-lbl{font-size:11px;color:var(--text2)}.stat-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.sv-g{color:var(--green)}.sv-r{color:var(--red)}.sv-o{color:var(--orange)}.sv-b{color:var(--blue)}
+
+/* PROGRESS BAR */
+.prog-wrap{height:5px;background:var(--bg4);border-radius:3px;overflow:hidden;margin-top:8px}
+.prog-fill{height:100%;border-radius:3px;transition:width .4s;background:var(--green)}
+
+/* TERMINAL */
+.terminal{background:#04060d;border:1px solid var(--border);border-radius:10px;
+  padding:12px 14px;font-family:'JetBrains Mono',monospace;font-size:11.5px;
+  height:200px;overflow-y:auto;line-height:1.8}
+.terminal::-webkit-scrollbar{width:4px}
+.terminal::-webkit-scrollbar-thumb{background:var(--border2)}
+
+/* BUTTONS */
+.btn{padding:8px 16px;border-radius:8px;border:none;font-size:12px;font-weight:600;
+  cursor:pointer;transition:all .16s;font-family:'Space Grotesk',sans-serif}
+.btn-green{background:var(--green);color:#000}.btn-green:hover{background:var(--green2)}
+.btn-red{background:rgba(255,23,68,.15);color:#ff5252;border:1px solid rgba(255,23,68,.3)}
+.btn-red:hover{background:rgba(255,23,68,.25)}
+.btn-ghost{background:transparent;border:1px solid var(--border2);color:var(--text2)}
+.btn-ghost:hover{background:var(--bg3);color:var(--text);border-color:var(--border3)}
+.btn-stop{background:rgba(255,109,0,.15);color:#ff9100;border:1px solid rgba(255,109,0,.3)}
+.btn-stop:hover{background:rgba(255,109,0,.25)}
+
+/* BUG TABLE */
+.bug-table{width:100%;border-collapse:collapse;font-size:11.5px}
+.bug-table th{text-align:left;padding:8px 10px;color:var(--text3);font-weight:700;
+  font-size:10px;letter-spacing:.6px;text-transform:uppercase;
+  border-bottom:1px solid var(--border);background:var(--card2);position:sticky;top:0}
+.bug-table td{padding:8px 10px;border-bottom:1px solid var(--border);vertical-align:middle}
+.bug-table tr:last-child td{border-bottom:none}
+.bug-table tr:hover td{background:var(--bg3)}
+.status-badge{display:inline-block;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:600}
+.status-badge.active{background:rgba(255,23,68,.1);color:#ff5252;border:1px solid rgba(255,23,68,.22)}
+.status-badge.resolved{background:rgba(0,230,118,.1);color:#00e676;border:1px solid rgba(0,230,118,.22)}
+
+/* SUB-TABS (Bug Types) */
+.sub-tabs{display:flex;gap:4px;background:var(--bg3);padding:4px;border-radius:10px;margin-bottom:14px}
+.sub-tab{flex:1;padding:7px;border-radius:7px;border:none;background:transparent;
+  color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;transition:all .16s;font-family:'Space Grotesk',sans-serif}
+.sub-tab.active{background:var(--card);color:var(--text)}
+
+/* SETTINGS */
+.settings-row{display:flex;align-items:center;justify-content:space-between;
+  padding:11px 0;border-bottom:1px solid var(--border)}
+.settings-row:last-child{border-bottom:none}
+.settings-lbl{font-size:12px;font-weight:500}
+.settings-sub{font-size:10px;color:var(--text3);margin-top:2px}
+.toggle{width:38px;height:21px;border-radius:11px;border:none;cursor:pointer;
+  position:relative;transition:background .2s;flex-shrink:0}
+.toggle.on{background:var(--green)}.toggle.off{background:var(--border2)}
+.toggle::after{content:'';position:absolute;width:17px;height:17px;border-radius:50%;
+  background:#fff;top:2px;transition:left .2s}
+.toggle.on::after{left:19px}.toggle.off::after{left:2px}
+select{background:var(--bg3);border:1px solid var(--border2);color:var(--text);
+  border-radius:7px;padding:5px 9px;font-size:12px;font-family:'Space Grotesk',sans-serif}
+
+/* WORKFLOW NODES */
+.wf-flow{display:flex;align-items:center;overflow-x:auto;padding:10px 0;gap:0}
+.wf-node{display:flex;flex-direction:column;align-items:center;min-width:110px}
+.wf-box{width:90px;height:72px;border-radius:10px;border:2px solid var(--border2);
+  background:var(--card2);display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;font-size:10px;text-align:center;padding:6px;transition:all .3s}
+.wf-box.done{border-color:var(--green);background:rgba(0,230,118,.06)}
+.wf-box.active{border-color:var(--cyan);background:rgba(0,229,255,.06);box-shadow:0 0 16px rgba(0,229,255,.15)}
+.wf-icon{font-size:20px}.wf-name{color:var(--text2);font-weight:600;transition:color .3s}
+.wf-box.done .wf-name{color:var(--green)}.wf-box.active .wf-name{color:var(--cyan)}
+.wf-sub{color:var(--text3);font-size:9px}
+.wf-arrow{color:var(--text3);font-size:20px;padding:0 6px;align-self:center;margin-bottom:18px;transition:color .3s}
+.wf-arrow.done{color:var(--green)}
+.wf-step-lbl{font-size:9px;color:var(--text3);margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
+
+/* THEME SWATCHES MODAL */
+.theme-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;
+  align-items:center;justify-content:center}
+.theme-overlay.open{display:flex}
+.theme-modal{background:var(--bg2);border:1px solid var(--border2);border-radius:16px;
+  padding:24px;min-width:340px;max-width:90vw}
+.theme-modal-title{font-size:14px;font-weight:700;margin-bottom:16px;color:var(--text)}
+.theme-swatches{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+.swatch{border-radius:10px;padding:12px 8px;cursor:pointer;border:2px solid transparent;
+  text-align:center;transition:all .2s;font-size:11px;font-weight:600}
+.swatch:hover{transform:scale(1.04)}.swatch.selected{border-color:#fff}
+.swatch-circle{width:36px;height:36px;border-radius:50%;margin:0 auto 6px;border:2px solid rgba(255,255,255,.3)}
+.theme-close{width:100%;padding:9px;border-radius:8px;border:1px solid var(--border2);
+  background:transparent;color:var(--text2);font-size:12px;font-weight:600;
+  cursor:pointer;font-family:'Space Grotesk',sans-serif}
+.theme-close:hover{background:var(--bg3);color:var(--text)}
+
+/* ENGINE INFO BAR */
+.engine-info{display:flex;gap:20px;flex-wrap:wrap;align-items:center;
+  font-size:11px;padding:10px 0;border-bottom:1px solid var(--border);margin-bottom:12px}
+.engine-info span{color:var(--text2)}
+.engine-info strong{color:var(--text)}
+.url-badge{background:rgba(41,121,255,.1);border:1px solid rgba(41,121,255,.2);
+  color:#5b9fff;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:600;
+  font-family:'JetBrains Mono',monospace}
+.export-msg{display:none;background:rgba(0,230,118,.08);border:1px solid rgba(0,230,118,.2);
+  border-radius:8px;padding:10px 14px;font-size:12px;color:#00e676;margin-top:10px}
+/* STABLE/COMPLETE banner — shown when all tests done + all bugs resolved */
+.complete-banner{
+  display:none;align-items:center;gap:12px;
+  background:linear-gradient(135deg,rgba(0,200,83,.12),rgba(0,230,118,.06));
+  border:1.5px solid rgba(0,230,118,.45);border-radius:10px;
+  padding:12px 16px;margin-top:8px;
+}
+.complete-banner-icon{font-size:22px;flex-shrink:0}
+.complete-banner-text{flex:1}
+.complete-banner-title{font-size:13px;font-weight:700;color:#00e676;margin-bottom:2px}
+.complete-banner-sub{font-size:11px;color:var(--text2)}
+</style>
+</head>
+<body>
+
+<!-- ── SIDEBAR ──────────────────────────────────────────── -->
+<div id="sidebar">
+  <div class="sb-head">
+    <div class="sb-logo-row">
+      <div class="sb-logo">
+        <svg viewBox="0 0 20 20"><path d="M10 2L3 6v8l7 4 7-4V6L10 2zm0 2.2L15.5 7 10 9.8 4.5 7 10 4.2zM4 8.5l5.5 3.1v5L4 13.5v-5zm7.5 8.1v-5L17 8.5v5l-5.5 3.1z"/></svg>
+      </div>
+      <div>
+        <div class="sb-brand">OSS Fuzzing</div>
+        <div class="sb-sub">Security Platform v5.0</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- NAV LINKS -->
+  <div class="sb-nav">
+    <div class="sb-section">Navigation</div>
+    <button class="nav-btn active" id="nav-fuzzing" onclick="showTab('fuzzing')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      <span class="nav-lbl">Fuzzing Engine</span>
+    </button>
+    <button class="nav-btn" id="nav-analytics" onclick="showTab('analytics')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+      <span class="nav-lbl">Bug Analytics</span>
+      <span class="nav-badge" id="nb-found" style="display:none">0</span>
+    </button>
+    <button class="nav-btn" id="nav-bugtypes" onclick="showTab('bugtypes')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <span class="nav-lbl">Bug Types</span>
+    </button>
+    <button class="nav-btn" id="nav-workflow" onclick="showTab('workflow')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="5" r="3"/><line x1="12" y1="8" x2="12" y2="10"/><circle cx="5" cy="19" r="3"/><circle cx="19" cy="19" r="3"/><path d="M12 10l-7 6m7-6l7 6"/></svg>
+      <span class="nav-lbl">Live Workflow</span>
+    </button>
+    <button class="nav-btn" id="nav-settings" onclick="showTab('settings')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      <span class="nav-lbl">Settings</span>
+    </button>
+
+    <div class="sb-divider"></div>
+
+    <!-- LIVE MONITOR SECTION -->
+    <div class="sb-live-section">
+      <div class="sb-panel-title">
+        <div class="sb-dot idle" id="sbDot"></div>
+        <span id="sbStatus">IDLE</span>
+      </div>
+      <div class="sb-stat-row">
+        <span class="sb-stat-lbl">Total Bugs</span>
+        <span class="sb-stat-val sv-r" id="sb-total">0</span>
+      </div>
+      <div class="sb-stat-row">
+        <span class="sb-stat-lbl">Solved</span>
+        <span class="sb-stat-val sv-g" id="sb-solved">0</span>
+      </div>
+      <div class="sb-stat-row">
+        <span class="sb-stat-lbl">Unsolved</span>
+        <span class="sb-stat-val sv-o" id="sb-unsolved">0</span>
+      </div>
+      <div class="sb-bar-row" style="margin-top:6px">
+        <span class="sb-bar-lbl" style="color:var(--green)">Solved</span>
+        <div class="sb-bar-track"><div class="sb-bar-fill" id="sb-bar-solved" style="width:0%;background:var(--green)"></div></div>
+        <span class="sb-bar-pct sv-g" id="sb-pct-solved">0%</span>
+      </div>
+      <div class="sb-bar-row">
+        <span class="sb-bar-lbl" style="color:var(--orange)">Unsolved</span>
+        <div class="sb-bar-track"><div class="sb-bar-fill" id="sb-bar-unsolved" style="width:0%;background:var(--orange)"></div></div>
+        <span class="sb-bar-pct sv-o" id="sb-pct-unsolved">0%</span>
+      </div>
+
+      <!-- HEARTBEAT BUG DISCOVERY LINE CHART -->
+      <div class="sb-chart-title">Bug Discovery Rate</div>
+      <div class="sb-chart-box" style="height:70px">
+        <canvas id="sbHeartChart"></canvas>
+      </div>
+
+      <!-- LIVE PIE CHART - BUG TYPES -->
+      <div class="sb-chart-title">Bug Types (Live)</div>
+      <div class="sb-chart-box" style="height:110px">
+        <canvas id="sbPieChart"></canvas>
+      </div>
+
+      <!-- PIPELINE IN SIDEBAR -->
+      <div class="sb-chart-title">Pipeline Workflow</div>
+      <div id="sbPipeline">
+        <div class="sb-pipe-step">
+          <div class="sb-pipe-dot-col"><div class="sb-pipe-dot" id="pd0"></div><div class="sb-pipe-line" id="pl0"></div></div>
+          <div class="sb-pipe-text" id="pt0"><div class="sb-pipe-name">Target OSS</div><div class="sb-pipe-sub">Load C Source</div></div>
+        </div>
+        <div class="sb-pipe-step">
+          <div class="sb-pipe-dot-col"><div class="sb-pipe-dot" id="pd1"></div><div class="sb-pipe-line" id="pl1"></div></div>
+          <div class="sb-pipe-text" id="pt1"><div class="sb-pipe-name">Fuzzing Engine</div><div class="sb-pipe-sub">Input Generation</div></div>
+        </div>
+        <div class="sb-pipe-step">
+          <div class="sb-pipe-dot-col"><div class="sb-pipe-dot" id="pd2"></div><div class="sb-pipe-line" id="pl2"></div></div>
+          <div class="sb-pipe-text" id="pt2"><div class="sb-pipe-name">Exec Monitor</div><div class="sb-pipe-sub">Crash Detection</div></div>
+        </div>
+        <div class="sb-pipe-step">
+          <div class="sb-pipe-dot-col"><div class="sb-pipe-dot" id="pd3"></div><div class="sb-pipe-line" id="pl3"></div></div>
+          <div class="sb-pipe-text" id="pt3"><div class="sb-pipe-name">Bug Classifier</div><div class="sb-pipe-sub">Type & Severity</div></div>
+        </div>
+        <div class="sb-pipe-step">
+          <div class="sb-pipe-dot-col"><div class="sb-pipe-dot" id="pd4"></div><div class="sb-pipe-line" id="pl4"></div></div>
+          <div class="sb-pipe-text" id="pt4"><div class="sb-pipe-name">Dashboard</div><div class="sb-pipe-sub">Visual Report</div></div>
+        </div>
+        <div class="sb-pipe-step">
+          <div class="sb-pipe-dot-col"><div class="sb-pipe-dot" id="pd5"></div></div>
+          <div class="sb-pipe-text" id="pt5"><div class="sb-pipe-name">Mutation Loop</div><div class="sb-pipe-sub">Feedback & Re-fuzz</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── MAIN CONTENT ─────────────────────────────────────── -->
+<div id="main">
+
+  <!-- TOPBAR -->
+  <div class="topbar">
+    <div>
+      <div class="topbar-title">⬡ OSS Vulnerability Detection Platform</div>
+      <div class="topbar-sub">KUDIKUDI AKHIL · 2ND MCA IV SEM · H.T.: 104324862027 · GUIDE: U. RAJENDER · UPG COLLEGE SIDDIPET</div>
+    </div>
+    <div class="topbar-right">
+      <div class="file-chip" id="fileChip">📄 <span id="fileChipName"></span></div>
+      <div class="user-chip"><div class="user-avatar" id="userInitial">?</div><span id="userGreeting">Guest</span></div>
+      <div class="live-badge idle" id="liveBadge"><div class="dot"></div><span id="liveTxt">IDLE</span></div>
+      <button class="logout-btn" onclick="doLogout()">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>Logout
+      </button>
+    </div>
+  </div>
+
+  <!-- SCROLLABLE CONTENT -->
+  <div class="content-area">
+
+    <!-- ══ TAB: FUZZING ENGINE ════════════════════════════ -->
+    <div class="tab-pane active" id="tab-fuzzing">
+      <!-- 4 stat cards -->
+      <div class="cols-4">
+        <div class="stat g"><div class="stat-val sv-g" id="f-sent">0</div><div class="stat-lbl">Inputs Sent</div></div>
+        <div class="stat r"><div class="stat-val sv-r" id="f-found">0</div><div class="stat-lbl">Bugs Found</div></div>
+        <div class="stat o"><div class="stat-val sv-o" id="f-active">0</div><div class="stat-lbl">Active / Unsolved</div></div>
+        <div class="stat g"><div class="stat-val sv-g" id="f-resolved">0</div><div class="stat-lbl">Resolved</div></div>
+      </div>
+
+      <!-- Engine control card -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:4px">
+          <div class="card-title" style="margin:0">Fuzzing Engine Control</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-green" id="startBtn" onclick="toggleEngine()">▶ Start Fuzzing</button>
+            <button class="btn btn-stop"  id="stopBtn"  onclick="stopEngine()">⏹ Stop</button>
+            <button class="btn btn-ghost" onclick="openAddFilesDialog()">📁 Add Files</button>
+            <button class="btn btn-ghost" onclick="generateFinalReport()">📥 Export Report</button>
+            <button class="btn btn-ghost" onclick="resetFuzzing()">↺ Reset</button>
+          </div>
+        </div>
+        <!-- Engine live info bar — updates every tick -->
+        <div class="engine-info">
+          <span>Strategy: <strong id="f-strategy">—</strong></span>
+          <span>Iteration: <strong id="f-iter">1</strong></span>
+          <span>Speed: <strong id="f-speed-lbl">Normal (1x)</strong></span>
+          <span>Session: <strong id="f-time">00:00</strong></span>
+          <span class="url-badge" id="urlCountBadge">0 URLs loaded</span>
+        </div>
+        <div id="exportMsg" class="export-msg"></div>
+        <!-- STABLE/COMPLETE banner — shown after all tests done + all bugs resolved -->
+        <div id="completeBanner" class="complete-banner">
+          <div class="complete-banner-icon">✅</div>
+          <div class="complete-banner-text">
+            <div class="complete-banner-title">SESSION STABLE — All Tests Complete · All Bugs Resolved</div>
+            <div class="complete-banner-sub">Active bugs = 0 &nbsp;·&nbsp; Click <strong>📥 Export Report</strong> to download the security report &nbsp;·&nbsp; Click <strong>↺ Reset</strong> to start a new session</div>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text3);margin-bottom:4px">
+          <span>Fuzzing Progress</span><span id="f-pct">0%</span>
+        </div>
+        <div class="prog-wrap"><div class="prog-fill" id="f-prog" style="width:0%;background:linear-gradient(90deg,var(--green2),var(--green))"></div></div>
+      </div>
+
+      <!-- Terminal -->
+      <div class="card">
+        <div class="card-title">Live Terminal Feed</div>
+        <div class="terminal" id="terminal">
+          <span style="color:#3d5068">[ OSS Fuzzing Platform v5.0 — Ready ]</span><br>
+          <span style="color:#3d5068">[ Upload a file and click Start Fuzzing to begin. ]</span><br>
+        </div>
+      </div>
+
+      <!-- Bug table -->
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="card-title" style="margin:0">Recent Bugs — Live Session</div>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="filterBugs('all')">All</button>
+            <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="filterBugs('active')">Unsolved</button>
+            <button class="btn btn-ghost" style="padding:4px 10px;font-size:11px" onclick="filterBugs('resolved')">Solved</button>
+          </div>
+        </div>
+        <div style="overflow-x:auto;max-height:240px;overflow-y:auto">
+          <table class="bug-table">
+            <thead><tr><th>#</th><th>Type</th><th>Severity</th><th>Input Sample</th><th>Target</th><th>Status</th></tr></thead>
+            <tbody id="fuzz-tbody"><tr><td colspan="6" style="color:var(--text3);text-align:center;padding:20px">No bugs found yet — Start engine to begin</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TAB: BUG ANALYTICS ══════════════════════════════ -->
+    <div class="tab-pane" id="tab-analytics">
+      <div class="cols-4">
+        <div class="stat g"><div class="stat-val sv-g" id="a-sent">0</div><div class="stat-lbl">Total Inputs</div></div>
+        <div class="stat r"><div class="stat-val sv-r" id="a-found">0</div><div class="stat-lbl">Total Bugs</div>
+          <div class="prog-wrap"><div class="prog-fill" id="a-bug-prog" style="width:0%;background:var(--red)"></div></div>
+        </div>
+        <div class="stat g"><div class="stat-val sv-g" id="a-resolved">0</div><div class="stat-lbl">Solved</div>
+          <div class="prog-wrap"><div class="prog-fill" id="a-res-prog" style="width:0%"></div></div>
+        </div>
+        <div class="stat o"><div class="stat-val sv-o" id="a-active">0</div><div class="stat-lbl">Unsolved</div>
+          <div class="stat-sub" id="a-res-pct">0% resolved</div>
+        </div>
+      </div>
+      <div class="cols-2">
+        <div class="card"><div class="card-title">Bug Types — Pie Chart</div>
+          <div style="height:220px;position:relative"><canvas id="pieChart"></canvas></div>
+        </div>
+        <div class="card"><div class="card-title">Severity — Bar Chart</div>
+          <div style="height:220px;position:relative"><canvas id="sevChart"></canvas></div>
+        </div>
+      </div>
+      <div class="cols-2">
+        <div class="card"><div class="card-title">Solved vs Unsolved</div>
+          <div style="height:200px;position:relative"><canvas id="solvedChart"></canvas></div>
+        </div>
+        <div class="card"><div class="card-title">Discovery Over Time</div>
+          <div style="height:200px;position:relative"><canvas id="timeChart"></canvas></div>
+        </div>
+      </div>
+      <div class="card">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="card-title" style="margin:0">All Bugs Log</div>
+        </div>
+        <div style="overflow-x:auto;max-height:240px;overflow-y:auto">
+          <table class="bug-table">
+            <thead><tr><th>#</th><th>Type</th><th>Severity</th><th>Input</th><th>Target</th><th>Status</th></tr></thead>
+            <tbody id="analytics-tbody"><tr><td colspan="6" style="color:var(--text3);text-align:center;padding:20px">Start fuzzing to populate</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TAB: BUG TYPES ══════════════════════════════════ -->
+    <div class="tab-pane" id="tab-bugtypes">
+      <div class="sub-tabs">
+        <button class="sub-tab active" id="stab-bof"    onclick="showSubTab('bof')">Buffer Overflow</button>
+        <button class="sub-tab"        id="stab-memleak" onclick="showSubTab('memleak')">Memory Leak</button>
+        <button class="sub-tab"        id="stab-nullptr" onclick="showSubTab('nullptr')">Null Pointer</button>
+        <button class="sub-tab"        id="stab-intovf"  onclick="showSubTab('intovf')">Integer Overflow</button>
+      </div>
+      <!-- BOF -->
+      <div id="sub-bof">
+        <div class="cols-3" style="margin-bottom:12px">
+          <div class="stat r"><div class="stat-val sv-r" id="bof-total">0</div><div class="stat-lbl">Total Found</div></div>
+          <div class="stat o"><div class="stat-val sv-o" id="bof-active">0</div><div class="stat-lbl">Unsolved</div></div>
+          <div class="stat g"><div class="stat-val sv-g" id="bof-resolved">0</div><div class="stat-lbl">Solved</div></div>
+        </div>
+        <div class="card"><div class="card-title">Description</div>
+          <p style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:10px">A buffer overflow occurs when a program writes more data into a fixed-size buffer than it can hold. Can allow attackers to inject and execute arbitrary code. The Heartbleed OpenSSL bug (2014) was a famous real-world example.</p>
+          <div style="background:rgba(255,23,68,.06);border:1px solid rgba(255,23,68,.2);border-radius:8px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ff5252">Fix: Replace strcpy() with strncpy(size-1). Validate input length before copying.</div>
+        </div>
+        <div class="card"><div class="card-title">Live Count — Bar Chart</div>
+          <div style="height:160px;position:relative"><canvas id="bofBarChart"></canvas></div>
+        </div>
+        <div class="card"><div class="card-title">Instances</div>
+          <div style="overflow-x:auto;max-height:180px;overflow-y:auto"><table class="bug-table"><thead><tr><th>#</th><th>Type</th><th>Severity</th><th>Target</th></tr></thead><tbody id="bof-tbody"></tbody></table></div>
+        </div>
+      </div>
+      <!-- MEMLEAK -->
+      <div id="sub-memleak" style="display:none">
+        <div class="cols-3" style="margin-bottom:12px">
+          <div class="stat r"><div class="stat-val sv-r" id="mem-total">0</div><div class="stat-lbl">Total Found</div></div>
+          <div class="stat o"><div class="stat-val sv-o" id="mem-active">0</div><div class="stat-lbl">Unsolved</div></div>
+          <div class="stat g"><div class="stat-val sv-g" id="mem-resolved">0</div><div class="stat-lbl">Solved</div></div>
+        </div>
+        <div class="card"><div class="card-title">Description</div>
+          <p style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:10px">Memory allocated via malloc but never freed. Accumulates over time, causing slowdowns and eventual system failure. Especially dangerous in long-running servers.</p>
+          <div style="background:rgba(255,109,0,.06);border:1px solid rgba(255,109,0,.2);border-radius:8px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ff9100">Fix: Every malloc() needs a matching free(). Use Valgrind: valgrind --leak-check=full ./program</div>
+        </div>
+        <div class="card"><div class="card-title">Live Count — Bar Chart</div>
+          <div style="height:160px;position:relative"><canvas id="memBarChart"></canvas></div>
+        </div>
+        <div class="card"><div class="card-title">Instances</div>
+          <div style="overflow-x:auto;max-height:180px;overflow-y:auto"><table class="bug-table"><thead><tr><th>#</th><th>Type</th><th>Severity</th><th>Target</th></tr></thead><tbody id="mem-tbody"></tbody></table></div>
+        </div>
+      </div>
+      <!-- NULLPTR -->
+      <div id="sub-nullptr" style="display:none">
+        <div class="cols-3" style="margin-bottom:12px">
+          <div class="stat r"><div class="stat-val sv-r" id="null-total">0</div><div class="stat-lbl">Total Found</div></div>
+          <div class="stat o"><div class="stat-val sv-o" id="null-active">0</div><div class="stat-lbl">Unsolved</div></div>
+          <div class="stat g"><div class="stat-val sv-g" id="null-resolved">0</div><div class="stat-lbl">Solved</div></div>
+        </div>
+        <div class="card"><div class="card-title">Description</div>
+          <p style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:10px">A null pointer dereference happens when the program reads/writes through a NULL pointer (address 0), causing an immediate segmentation fault. One of the most common crash bugs found by fuzzers.</p>
+          <div style="background:rgba(255,214,0,.06);border:1px solid rgba(255,214,0,.2);border-radius:8px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#ffd600">Fix: Always check: if(ptr != NULL) before dereferencing. Never dereference without validation.</div>
+        </div>
+        <div class="card"><div class="card-title">Live Count — Bar Chart</div>
+          <div style="height:160px;position:relative"><canvas id="nullBarChart"></canvas></div>
+        </div>
+        <div class="card"><div class="card-title">Instances</div>
+          <div style="overflow-x:auto;max-height:180px;overflow-y:auto"><table class="bug-table"><thead><tr><th>#</th><th>Type</th><th>Severity</th><th>Target</th></tr></thead><tbody id="null-tbody"></tbody></table></div>
+        </div>
+      </div>
+      <!-- INTOVF -->
+      <div id="sub-intovf" style="display:none">
+        <div class="cols-3" style="margin-bottom:12px">
+          <div class="stat r"><div class="stat-val sv-r" id="int-total">0</div><div class="stat-lbl">Total Found</div></div>
+          <div class="stat o"><div class="stat-val sv-o" id="int-active">0</div><div class="stat-lbl">Unsolved</div></div>
+          <div class="stat g"><div class="stat-val sv-g" id="int-resolved">0</div><div class="stat-lbl">Solved</div></div>
+        </div>
+        <div class="card"><div class="card-title">Description</div>
+          <p style="font-size:12px;color:var(--text2);line-height:1.7;margin-bottom:10px">Integer overflow occurs when arithmetic produces a value exceeding the type's max. For 32-bit int, 2,147,483,647 + 1 wraps to -2,147,483,648. Can cause logic bypasses, corrupt allocations, and security vulnerabilities.</p>
+          <div style="background:rgba(41,121,255,.06);border:1px solid rgba(41,121,255,.2);border-radius:8px;padding:10px;font-family:'JetBrains Mono',monospace;font-size:11px;color:#5b9fff">Fix: Validate ranges. Use long long. Compile with -fsanitize=integer to detect at runtime.</div>
+        </div>
+        <div class="card"><div class="card-title">Live Count — Bar Chart</div>
+          <div style="height:160px;position:relative"><canvas id="intBarChart"></canvas></div>
+        </div>
+        <div class="card"><div class="card-title">Instances</div>
+          <div style="overflow-x:auto;max-height:180px;overflow-y:auto"><table class="bug-table"><thead><tr><th>#</th><th>Type</th><th>Severity</th><th>Target</th></tr></thead><tbody id="int-tbody"></tbody></table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ TAB: LIVE WORKFLOW ══════════════════════════════ -->
+    <div class="tab-pane" id="tab-workflow">
+      <div class="card">
+        <div class="card-title">Fuzzing Pipeline — Live Animation</div>
+        <div class="wf-flow">
+          <div class="wf-node"><div class="wf-box" id="wfn0"><div class="wf-icon">🎯</div><div class="wf-name">Target OSS</div><div class="wf-sub">C Source</div></div><div class="wf-step-lbl">Step 1</div></div>
+          <div class="wf-arrow" id="wfa0">→</div>
+          <div class="wf-node"><div class="wf-box" id="wfn1"><div class="wf-icon">⚡</div><div class="wf-name">Fuzzing Engine</div><div class="wf-sub">Input Gen</div></div><div class="wf-step-lbl">Step 2</div></div>
+          <div class="wf-arrow" id="wfa1">→</div>
+          <div class="wf-node"><div class="wf-box" id="wfn2"><div class="wf-icon">👁️</div><div class="wf-name">Exec Monitor</div><div class="wf-sub">Crash Detect</div></div><div class="wf-step-lbl">Step 3</div></div>
+          <div class="wf-arrow" id="wfa2">→</div>
+          <div class="wf-node"><div class="wf-box" id="wfn3"><div class="wf-icon">🔍</div><div class="wf-name">Bug Classifier</div><div class="wf-sub">Type & Sev</div></div><div class="wf-step-lbl">Step 4</div></div>
+          <div class="wf-arrow" id="wfa3">→</div>
+          <div class="wf-node"><div class="wf-box" id="wfn4"><div class="wf-icon">📊</div><div class="wf-name">Dashboard</div><div class="wf-sub">Report</div></div><div class="wf-step-lbl">Step 5</div></div>
+          <div class="wf-arrow" id="wfa4">→</div>
+          <div class="wf-node"><div class="wf-box" id="wfn5"><div class="wf-icon">🔄</div><div class="wf-name">Mutation Loop</div><div class="wf-sub">Re-fuzz</div></div><div class="wf-step-lbl">Step 6</div></div>
+        </div>
+      </div>
+      <div class="card"><div class="card-title">Live Workflow Event Log</div>
+        <div class="terminal" id="wfTerminal" style="height:220px">
+          <span style="color:#3d5068">[ Workflow Monitor ] Waiting for session to start...</span><br>
+        </div>
+      </div>
+      <div class="cols-2">
+        <div class="card"><div class="card-title">Throughput Over Time</div><div style="height:180px;position:relative"><canvas id="wfThroughput"></canvas></div></div>
+        <div class="card"><div class="card-title">Resolution Rate</div><div style="height:180px;position:relative"><canvas id="wfResRate"></canvas></div></div>
+      </div>
+    </div>
+
+    <!-- ══ TAB: SETTINGS ═══════════════════════════════════ -->
+    <div class="tab-pane" id="tab-settings">
+      <div class="card">
+        <div class="card-title">Fuzzing Engine Settings</div>
+        <div class="settings-row">
+          <div><div class="settings-lbl">Fuzzing Speed</div><div class="settings-sub">Controls how fast inputs are sent to targets</div></div>
+          <select id="speed-select" onchange="updateSpeed(this.value)">
+            <option value="slow">🐢 Slow — 2000ms interval</option>
+            <option value="normal" selected>🚶 Normal — 700ms interval</option>
+            <option value="fast">🏃 Fast — 250ms interval</option>
+            <option value="turbo">🚀 Turbo — 80ms interval</option>
+          </select>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-lbl">Mutation Feedback Loop</div><div class="settings-sub">Use crash inputs as seeds for deeper fuzzing</div></div>
+          <button class="toggle on" id="toggle-mutation" onclick="toggleSetting('mutation')"></button>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-lbl">Auto-resolve Bugs</div><div class="settings-sub">Automatically mark bugs resolved after mutation patches</div></div>
+          <button class="toggle on" id="toggle-autores" onclick="toggleSetting('autores')"></button>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-lbl">Terminal Logging</div><div class="settings-sub">Show live input stream in terminal</div></div>
+          <button class="toggle on" id="toggle-terminal" onclick="toggleSetting('terminal')"></button>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-lbl">Boundary Fuzzing</div><div class="settings-sub">Include edge-case values: INT_MAX, empty strings, etc.</div></div>
+          <button class="toggle on" id="toggle-boundary" onclick="toggleSetting('boundary')"></button>
+        </div>
+        <div class="settings-row">
+          <div><div class="settings-lbl">Auto-scroll Terminal</div><div class="settings-sub">Keep terminal scrolled to latest log entry</div></div>
+          <button class="toggle on" id="toggle-autoscroll" onclick="toggleSetting('autoscroll')"></button>
+        </div>
+      </div>
+
+      <!-- THEME SETTINGS -->
+      <div class="card">
+        <div class="card-title">Display Theme</div>
+        <div class="settings-row">
+          <div><div class="settings-lbl">Color Theme</div><div class="settings-sub">Toggle ON to pick a colour theme. Toggle OFF for Dark mode.</div></div>
+          <button class="toggle off" id="toggle-theme" onclick="toggleThemeMode()"></button>
+        </div>
+        <!-- Theme swatches — shown only when toggle is ON -->
+        <div id="themeSwatchArea" style="display:none;margin-top:12px">
+          <div style="font-size:11px;color:var(--text2);margin-bottom:10px">Select a colour theme:</div>
+          <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px">
+            <div class="swatch" onclick="applyTheme('dark')"     style="background:#07090f;color:#00e676;border:2px solid #00e676"><div style="font-size:18px;margin-bottom:4px">🌑</div>Dark</div>
+            <div class="swatch" onclick="applyTheme('blue')"     style="background:#00131f;color:#00b4d8"><div style="font-size:18px;margin-bottom:4px">🌊</div>Cyber Blue</div>
+            <div class="swatch" onclick="applyTheme('green')"    style="background:#010a01;color:#39ff14"><div style="font-size:18px;margin-bottom:4px">💚</div>Hacker Green</div>
+            <div class="swatch" onclick="applyTheme('purple')"   style="background:#0d0014;color:#d500f9"><div style="font-size:18px;margin-bottom:4px">🟣</div>Purple Night</div>
+            <div class="swatch" onclick="applyTheme('orange')"   style="background:#1a0800;color:#ff6d00"><div style="font-size:18px;margin-bottom:4px">🔥</div>Sunset Orange</div>
+            <div class="swatch" onclick="applyTheme('light')"    style="background:#f0f4f8;color:#1a2540"><div style="font-size:18px;margin-bottom:4px">☀️</div>Light Mode</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SESSION STATISTICS -->
+      <div class="card">
+        <div class="card-title">Session Statistics</div>
+        <div class="settings-row"><div class="settings-lbl">Sessions Run</div><span id="stat-sessions" style="font-size:14px;font-weight:700">0</span></div>
+        <div class="settings-row"><div class="settings-lbl">All-time Bugs Found</div><span id="stat-allbugs" style="font-size:14px;font-weight:700;color:var(--red)">0</span></div>
+        <div class="settings-row"><div class="settings-lbl">All-time Inputs Sent</div><span id="stat-allinputs" style="font-size:14px;font-weight:700">0</span></div>
+        <div class="settings-row" style="border:none">
+          <div><div class="settings-lbl">Clear Session Data</div><div class="settings-sub">Resets only the session statistics counters above</div></div>
+          <button class="btn btn-ghost" style="padding:5px 14px;font-size:11px" onclick="clearSessionStats()">Clear Session</button>
+        </div>
+        <div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--border)">
+          <button class="btn btn-red" style="width:100%;padding:9px" onclick="resetFuzzing()">🗑 Clear All Data — Full Reset to Zero</button>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- end content-area -->
+</div><!-- end main -->
+
+<!-- Load the engine scripts AFTER the HTML so all elements exist -->
+<script src="js/fuzzer.js"></script>
+<script src="js/fuzzer3.js"></script>
+<script src="js/fuzzer2.js"></script>
+
+<script>
+/*
+  DASHBOARD CONTROLLER
+  This inline script handles ONLY:
+  1. Tab switching (showTab, showSubTab)
+  2. Theme applying (applyTheme, toggleThemeMode)
+  3. Sidebar chart drawing (heartbeat line + pie)
+  4. Workflow node animation (main tab + sidebar)
+  5. Analytics & workflow charts
+  All engine logic is in fuzzer.js + fuzzer2.js
+*/
+
+/* ── TAB SWITCHING ──────────────────────────────────────── */
+/* showTab: hides all tab panes, shows the selected one */
+function showTab(id) {
+  /* Remove active class from all panes */
+  document.querySelectorAll('.tab-pane').forEach(function(p){ p.classList.remove('active'); });
+  /* Remove active class from all nav buttons */
+  document.querySelectorAll('.nav-btn').forEach(function(b){ b.classList.remove('active'); });
+  /* Show the selected pane */
+  var pane = document.getElementById('tab-'+id);
+  if (pane) pane.classList.add('active');
+  /* Highlight the selected nav button */
+  var btn = document.getElementById('nav-'+id);
+  if (btn) btn.classList.add('active');
+  /* Resize/reinit charts when their tab becomes visible — Chart.js needs
+     the container to be visible to calculate dimensions correctly */
+  if (id === 'analytics' || id === 'bugtypes' || id === 'workflow') {
+    setTimeout(function() {
+      if (typeof initAnalyticsCharts === 'function') initAnalyticsCharts();
+      if (typeof initBugTypeBarCharts === 'function') initBugTypeBarCharts();
+      if (typeof updateBugTypeBarCharts === 'function') updateBugTypeBarCharts();
+      /* initAnalyticsCharts() rebuilds every chart from scratch using
+         hardcoded EMPTY-STATE defaults (e.g. Solved vs Unsolved = [0,1]
+         so it shows a grey ring before any bugs exist). That reset wipes
+         out the real current numbers. So immediately after rebuilding,
+         re-push the actual live engine totals back into the charts —
+         otherwise re-opening this tab after the engine has already
+         finished would incorrectly show "Unsolved" again even though
+         every bug was already solved. */
+      if (typeof updateAnalyticsCharts === 'function' &&
+          typeof bugCount !== 'undefined' && typeof resolvedCount !== 'undefined') {
+        updateAnalyticsCharts(bugCount, resolvedCount, activeBugIds);
+      }
+      Object.keys(analyticsCharts||{}).forEach(function(k){
+        if (analyticsCharts[k]) analyticsCharts[k].resize();
+      });
+    }, 50);
+  }
+}
+
+/* showSubTab: switches between Bug Type sub-tabs */
+function showSubTab(k) {
+  /* Hide all sub-sections */
+  ['bof','memleak','nullptr','intovf'].forEach(function(s){
+    var el = document.getElementById('sub-'+s);
+    var tb = document.getElementById('stab-'+s);
+    if (el) el.style.display = 'none';
+    if (tb) tb.classList.remove('active');
+  });
+  /* Show selected section */
+  var sel = document.getElementById('sub-'+k);
+  var selTab = document.getElementById('stab-'+k);
+  if (sel) sel.style.display = 'block';
+  if (selTab) selTab.classList.add('active');
+}
+
+/* ── THEME SYSTEM ───────────────────────────────────────── */
+/* toggleThemeMode: toggle ON shows swatches, OFF = dark */
+function toggleThemeMode() {
+  var btn   = document.getElementById('toggle-theme');
+  var area  = document.getElementById('themeSwatchArea');
+  var isOn  = btn.classList.contains('on');
+  if (isOn) {
+    /* Turn OFF — hide swatches, apply dark */
+    btn.classList.remove('on'); btn.classList.add('off');
+    area.style.display = 'none';
+    applyTheme('dark');
+  } else {
+    /* Turn ON — show swatches so user can pick */
+    btn.classList.remove('off'); btn.classList.add('on');
+    area.style.display = 'block';
+  }
+}
+
+/* applyTheme: applies CSS variable overrides for the selected theme */
+function applyTheme(name) {
+  var root = document.documentElement;
+  /* First remove all overrides to reset to dark */
+  var all = ['--bg','--bg2','--bg3','--bg4','--text','--text2','--text3',
+             '--border','--border2','--card','--card2','--green','--green2',
+             '--green3','--cyan','--blue','--orange'];
+  all.forEach(function(v){ root.style.removeProperty(v); });
+
+  /* Apply the chosen theme's variable overrides */
+  var themes = {
+    dark:   {}, /* Dark = default, no overrides needed */
+    blue:   {'--bg':'#00131f','--bg2':'#001a2e','--bg3':'#002540','--card':'#001525',
+             '--card2':'#001e35','--green':'#00b4d8','--green2':'#0096c7',
+             '--green3':'rgba(0,180,216,.12)','--cyan':'#90e0ef'},
+    green:  {'--bg':'#010a01','--bg2':'#021002','--bg3':'#031503','--card':'#020d02',
+             '--card2':'#031203','--green':'#39ff14','--green2':'#2ecc00',
+             '--green3':'rgba(57,255,20,.12)','--cyan':'#39ff14'},
+    purple: {'--bg':'#0d0014','--bg2':'#110018','--bg3':'#18002a','--card':'#0e0015',
+             '--card2':'#13001e','--green':'#d500f9','--green2':'#aa00ff',
+             '--green3':'rgba(213,0,249,.1)','--cyan':'#ea80fc'},
+    orange: {'--bg':'#1a0800','--bg2':'#220a00','--bg3':'#2e0f00','--card':'#1c0900',
+             '--card2':'#250c00','--green':'#ff6d00','--green2':'#e65100',
+             '--green3':'rgba(255,109,0,.1)','--cyan':'#ff9100'},
+    light:  {'--bg':'#f0f4f8','--bg2':'#ffffff','--bg3':'#e8edf5','--bg4':'#d8e3ef',
+             '--text':'#1a2540','--text2':'#4a5a70','--text3':'#8a9bb0',
+             '--border':'#c8d5e8','--border2':'#b0c0d8','--card':'#ffffff','--card2':'#f5f8fd'}
+  };
+
+  var vars = themes[name] || {};
+  Object.keys(vars).forEach(function(k){ root.style.setProperty(k, vars[k]); });
+
+  /* Log theme change to terminal */
+  if (typeof logToTerminal === 'function') {
+    logToTerminal('[ THEME ] Applied: '+name,'#ea80fc');
+  }
+}
+
+/* ── SIDEBAR CHARTS ─────────────────────────────────────── */
+var heartChart = null;  /* Chart.js instance for heartbeat line */
+var sbPie      = null;  /* Chart.js instance for sidebar pie */
+var heartData  = new Array(40).fill(0); /* 40 data points for the line */
+/* Bug type counts for the pie chart */
+var pieData    = { bof:0, mem:0, nul:0, int:0 };
+
+/* initSidebarCharts: creates both Chart.js charts in the sidebar */
+function initSidebarCharts() {
+  /* Heartbeat line chart */
+  var hCtx = document.getElementById('sbHeartChart');
+  if (!hCtx) return;
+  if (heartChart) heartChart.destroy(); /* Destroy old chart if exists */
+  heartChart = new Chart(hCtx, {
+    type: 'line',
+    data: {
+      labels: new Array(40).fill(''),
+      datasets:[{
+        data: heartData,
+        borderColor: '#00e676',
+        borderWidth: 1.5,
+        tension: 0.4,
+        fill: true,
+        backgroundColor: 'rgba(0,230,118,.07)',
+        pointRadius: 0 /* No dots on the line — cleaner heartbeat look */
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{legend:{display:false}},
+      scales:{
+        x:{display:false},
+        y:{display:false, min:0, max:3}
+      }
+    }
+  });
+
+  /* Sidebar pie chart */
+  var pCtx = document.getElementById('sbPieChart');
+  if (!pCtx) return;
+  if (sbPie) sbPie.destroy();
+  sbPie = new Chart(pCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Buffer Overflow','Memory Leak','Null Pointer','Int Overflow'],
+      datasets:[{
+        data: [1,1,1,1], /* Start with equal placeholder values */
+        backgroundColor:['#ff1744','#ff6d00','#ffd600','#2979ff'],
+        borderWidth: 0
+      }]
+    },
+    options:{
+      responsive:true, maintainAspectRatio:false, animation:false,
+      plugins:{
+        legend:{
+          display:true, position:'bottom',
+          labels:{color:'#7a90ab',font:{size:9},boxWidth:10,padding:6}
+        }
+      }
+    }
+  });
+}
+
+/* updateSidebarCharts: called every engine tick to refresh charts */
+function updateSidebarCharts(newBugFound) {
+  if (!heartChart || !sbPie) return;
+
+  /* Heartbeat: push 1 if bug found this tick, else small random noise */
+  if (newBugFound) {
+    heartData.push(2 + Math.random()); /* Spike upward when bug found */
+  } else {
+    heartData.push(Math.random() * 0.3); /* Near-zero between bugs */
+  }
+  heartData.shift(); /* Remove oldest point to keep 40 points */
+
+  heartChart.data.datasets[0].data = heartData.slice(); /* Update chart data */
+  heartChart.update('none'); /* Redraw without animation for live feel */
+
+  /* Pie chart: update with real bug type counts */
+  sbPie.data.datasets[0].data = [
+    pieData.bof || 0,
+    pieData.mem || 0,
+    pieData.nul || 0,
+    pieData.int || 0
+  ];
+  /* If all zero, show equal placeholder so pie is visible */
+  if ((pieData.bof + pieData.mem + pieData.nul + pieData.int) === 0) {
+    sbPie.data.datasets[0].data = [1,1,1,1];
+  }
+  sbPie.update('none');
+}
+
+/* ── WORKFLOW ANIMATION (main tab) ─────────────────────── */
+/* advanceWorkflow: called when engine runs — updates wf nodes */
+var wfCurrentStep = 0;
+function advanceWorkflow(step) {
+  wfCurrentStep = step;
+  for (var i = 0; i <= 5; i++) {
+    var box  = document.getElementById('wfn'+i);
+    var arr  = document.getElementById('wfa'+i);
+    if (!box) continue;
+    box.classList.remove('done','active');
+    if (arr) arr.classList.remove('done');
+    if (i < step) {
+      box.classList.add('done');
+      if (arr) arr.classList.add('done');
+    } else if (i === step) {
+      box.classList.add('active');
+    }
+  }
+}
+
+/* resetWorkflowUI: clears all workflow node states */
+function resetWorkflowUI() {
+  for (var i = 0; i <= 5; i++) {
+    var box = document.getElementById('wfn'+i);
+    var arr = document.getElementById('wfa'+i);
+    if (box) box.classList.remove('done','active');
+    if (arr) arr.classList.remove('done');
+  }
+  wfCurrentStep = 0;
+}
+
+/* wfLog: writes a message to the workflow event log terminal */
+function wfLog(msg) {
+  var term = document.getElementById('wfTerminal');
+  if (!term) return;
+  term.innerHTML += '<span style="color:#7a90ab">['+new Date().toLocaleTimeString()+'] </span>'+msg+'<br>';
+  term.scrollTop = term.scrollHeight;
+}
+
+/* ── ANALYTICS CHARTS ───────────────────────────────────── */
+var analyticsCharts = {}; /* Store chart instances to destroy/recreate */
+
+/* ── BUG TYPE BAR CHARTS (one per sub-tab) ──────────────── */
+var bugTypeBarCharts = {}; /* bof / mem / null / int bar chart instances */
+
+/* initBugTypeBarCharts: creates a small bar chart in each bug type sub-tab */
+function initBugTypeBarCharts() {
+  var defs = [
+    { id:'bofBarChart',  label:'Buffer Overflow / Heap Overflow', color:'#ff1744' },
+    { id:'memBarChart',  label:'Memory Leak / Use After Free',    color:'#ff9100' },
+    { id:'nullBarChart', label:'Null Pointer Dereference',        color:'#ffd600' },
+    { id:'intBarChart',  label:'Integer Overflow / Format String',color:'#2979ff' }
+  ];
+  defs.forEach(function(d) {
+    var ctx = document.getElementById(d.id);
+    if (!ctx) return;
+    if (bugTypeBarCharts[d.id]) bugTypeBarCharts[d.id].destroy();
+    bugTypeBarCharts[d.id] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Total Found', 'Active / Unsolved', 'Resolved'],
+        datasets: [{
+          data: [0, 0, 0],
+          backgroundColor: [d.color, 'rgba(255,82,82,.7)', 'rgba(0,230,118,.7)'],
+          borderRadius: 6,
+          borderSkipped: false
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false },
+          title: { display: true, text: d.label,
+            color: '#7a90ab', font: { size: 10, family: "'Space Grotesk',sans-serif" } } },
+        scales: {
+          y: { beginAtZero: true, ticks: { color: '#7a90ab', stepSize: 1 }, grid: { color: '#141f30' } },
+          x: { ticks: { color: '#7a90ab' }, grid: { display: false } }
+        }
+      }
+    });
+  });
+}
+
+/* updateBugTypeBarCharts: refreshes all 4 bug type bar charts with live counts */
+function updateBugTypeBarCharts() {
+  var mapping = [
+    { chartId:'bofBarChart',  totalId:'bof-total',  activeId:'bof-active',  resolvedId:'bof-resolved'  },
+    { chartId:'memBarChart',  totalId:'mem-total',  activeId:'mem-active',  resolvedId:'mem-resolved'  },
+    { chartId:'nullBarChart', totalId:'null-total', activeId:'null-active', resolvedId:'null-resolved' },
+    { chartId:'intBarChart',  totalId:'int-total',  activeId:'int-active',  resolvedId:'int-resolved'  }
+  ];
+  mapping.forEach(function(m) {
+    var chart = bugTypeBarCharts[m.chartId];
+    if (!chart) return;
+    var t = parseInt(document.getElementById(m.totalId)   && document.getElementById(m.totalId).textContent   || 0);
+    var a = parseInt(document.getElementById(m.activeId)  && document.getElementById(m.activeId).textContent  || 0);
+    var r = parseInt(document.getElementById(m.resolvedId)&& document.getElementById(m.resolvedId).textContent|| 0);
+    chart.data.datasets[0].data = [t, a, r];
+    chart.update('none');
+  });
+}
+
+/* initAnalyticsCharts: creates the 4 charts in Bug Analytics tab */
+function initAnalyticsCharts() {
+  var chartDefs = [
+    { id:'pieChart',     type:'doughnut',
+      data:{labels:['Buffer Overflow','Memory Leak','Null Pointer','Int Overflow'],
+            datasets:[{data:[1,1,1,1],backgroundColor:['#ff1744','#ff6d00','#ffd600','#2979ff'],borderWidth:0}]} },
+    { id:'sevChart',     type:'bar',
+      data:{labels:['Critical','High','Medium'],
+            datasets:[{data:[0,0,0],backgroundColor:['#ff1744','#ff6d00','#ffd600'],borderRadius:6,borderSkipped:false}]} },
+    { id:'solvedChart',  type:'doughnut',
+      data:{labels:['Solved','Unsolved'],
+            datasets:[{data:[0,1],backgroundColor:['#00e676','#ff5252'],borderWidth:0}]} },
+    { id:'timeChart',    type:'line',
+      data:{labels:[],datasets:[{label:'Bugs Found',data:[],borderColor:'#00e676',
+            backgroundColor:'rgba(0,230,118,.1)',tension:.4,fill:true,pointRadius:2}]} }
+  ];
+
+  chartDefs.forEach(function(def){
+    var ctx = document.getElementById(def.id);
+    if (!ctx) return;
+    if (analyticsCharts[def.id]) analyticsCharts[def.id].destroy();
+    analyticsCharts[def.id] = new Chart(ctx, {
+      type: def.type, data: def.data,
+      options:{responsive:true,maintainAspectRatio:false,animation:false,
+        plugins:{legend:{labels:{color:'#7a90ab',font:{size:10}}}},
+        scales: def.type==='bar' ? {y:{beginAtZero:true,ticks:{color:'#7a90ab'},grid:{color:'#141f30'}},
+                                     x:{ticks:{color:'#7a90ab'},grid:{display:false}}} : {}
+      }
+    });
+  });
+
+  /* ── Workflow tab: Throughput Over Time (blue line) ───── */
+  var wfThrCtx = document.getElementById('wfThroughput');
+  if (wfThrCtx) {
+    if (analyticsCharts['wfThroughput']) analyticsCharts['wfThroughput'].destroy();
+    analyticsCharts['wfThroughput'] = new Chart(wfThrCtx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Tests Sent', data: [],
+        borderColor: '#2979ff', backgroundColor: 'rgba(41,121,255,.12)',
+        tension: 0.4, fill: true, pointRadius: 2, pointBackgroundColor: '#2979ff' }] },
+      options: { responsive:true, maintainAspectRatio:false, animation:false,
+        plugins: { legend: { display:true, labels:{ color:'#7a90ab', font:{size:10} } },
+          title: { display:true, text:'Total test inputs sent to URLs over time',
+            color:'#3d5068', font:{size:10} } },
+        scales: {
+          y: { beginAtZero:true, ticks:{ color:'#7a90ab', font:{size:10} }, grid:{ color:'#141f30' },
+            title:{ display:true, text:'Total Tests', color:'#7a90ab', font:{size:10} } },
+          x: { display:true, ticks:{ color:'#3d5068', font:{size:9}, maxTicksLimit:6 }, grid:{ display:false } }
+        }
+      }
+    });
+  }
+
+  /* ── Workflow tab: Resolution Rate (green line) ─────── */
+  var wfResCtx = document.getElementById('wfResRate');
+  if (wfResCtx) {
+    if (analyticsCharts['wfResRate']) analyticsCharts['wfResRate'].destroy();
+    analyticsCharts['wfResRate'] = new Chart(wfResCtx, {
+      type: 'line',
+      data: { labels: [], datasets: [{ label: 'Resolution %', data: [],
+        borderColor: '#00e676', backgroundColor: 'rgba(0,230,118,.10)',
+        tension: 0.4, fill: true, pointRadius: 2, pointBackgroundColor: '#00e676' }] },
+      options: { responsive:true, maintainAspectRatio:false, animation:false,
+        plugins: { legend: { display:true, labels:{ color:'#7a90ab', font:{size:10} } },
+          title: { display:true, text:'% of found bugs resolved over time',
+            color:'#3d5068', font:{size:10} } },
+        scales: {
+          y: { beginAtZero:true, max:100,
+            ticks: { color:'#7a90ab', font:{size:10}, callback:function(v){ return v+'%'; } },
+            grid: { color:'#141f30' },
+            title: { display:true, text:'Resolved %', color:'#7a90ab', font:{size:10} } },
+          x: { display:true, ticks:{ color:'#3d5068', font:{size:9}, maxTicksLimit:6 }, grid:{ display:false } }
+        }
+      }
+    });
+  }
+}
+
+/* updateAnalyticsCharts: refreshes analytics charts with live data */
+function updateAnalyticsCharts(bugCount, resolvedCount, activeBugIds) {
+  /* Update bug type bar charts live */
+  if (typeof updateBugTypeBarCharts === 'function') updateBugTypeBarCharts();
+  /* Update pie chart with real bug type data */
+  if (analyticsCharts['pieChart']) {
+    analyticsCharts['pieChart'].data.datasets[0].data = [
+      pieData.bof||0, pieData.mem||0, pieData.nul||0, pieData.int||0
+    ];
+    if ((pieData.bof+pieData.mem+pieData.nul+pieData.int)===0) {
+      analyticsCharts['pieChart'].data.datasets[0].data = [1,1,1,1];
+    }
+    analyticsCharts['pieChart'].update('none');
+  }
+  /* Solved vs Unsolved doughnut */
+  if (analyticsCharts['solvedChart']) {
+    analyticsCharts['solvedChart'].data.datasets[0].data = [
+      resolvedCount, Math.max(0, bugCount - resolvedCount)
+    ];
+    if (bugCount===0) analyticsCharts['solvedChart'].data.datasets[0].data=[0,1];
+    analyticsCharts['solvedChart'].update('none');
+  }
+  /* Timeline line chart — add a point */
+  if (analyticsCharts['timeChart']) {
+    var tc = analyticsCharts['timeChart'];
+    tc.data.labels.push(new Date().toLocaleTimeString());
+    tc.data.datasets[0].data.push(bugCount);
+    if (tc.data.labels.length > 30) {
+      tc.data.labels.shift(); tc.data.datasets[0].data.shift();
+    }
+    tc.update('none');
+  }
+
+  /* ── WORKFLOW TAB: Throughput Over Time ─────────────────
+     Shows how many tests (inputs sent) have been processed
+     over time. Pulls testCount from fuzzer.js live.
+     Adds a new data point every time engine calls updateAnalyticsCharts. */
+  if (analyticsCharts['wfThroughput']) {
+    var wt = analyticsCharts['wfThroughput'];
+    var now = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    wt.data.labels.push(now);
+    /* testCount is the global counter from fuzzer.js */
+    wt.data.datasets[0].data.push(typeof testCount !== 'undefined' ? testCount : 0);
+    /* Keep last 20 points so chart doesn't get too crowded */
+    if (wt.data.labels.length > 20) {
+      wt.data.labels.shift();
+      wt.data.datasets[0].data.shift();
+    }
+    wt.update('none');
+  }
+
+  /* ── WORKFLOW TAB: Resolution Rate ──────────────────────
+     Shows percentage of bugs resolved vs total bugs found.
+     Formula: (resolvedCount / bugCount) * 100
+     Goes from 0% up to 100% as bugs get auto-resolved. */
+  if (analyticsCharts['wfResRate']) {
+    var wr = analyticsCharts['wfResRate'];
+    var now2 = new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    wr.data.labels.push(now2);
+    /* Calculate resolution % — avoid divide-by-zero */
+    var pct = bugCount > 0 ? Math.round((resolvedCount / bugCount) * 100) : 0;
+    wr.data.datasets[0].data.push(pct);
+    if (wr.data.labels.length > 20) {
+      wr.data.labels.shift();
+      wr.data.datasets[0].data.shift();
+    }
+    wr.update('none');
+  }
+}
+
+/* ── PAGE STARTUP ───────────────────────────────────────── */
+window.onload = function() {
+  initDashboard();       /* From fuzzer.js — loads session data, sets up topbar */
+  initSidebarCharts();   /* Draw empty sidebar charts */
+  initAnalyticsCharts(); /* Draw empty analytics charts */
+  initBugTypeBarCharts();/* Draw empty bug-type bar charts in sub-tabs */
+};
+</script>
+
+</body>
+</html>

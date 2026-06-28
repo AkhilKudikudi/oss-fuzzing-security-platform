@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<!--
+  FILE    : register.html
+  PURPOSE : New user registration — Step 1 (alternate path).
+  MODULES USED:
+    css/styles.css → all visual styling
+    js/auth.js     → doRegister(), checkStrength(), showMsg()
+  HOW IT WORKS:
+    User fills all fields → clicks Register →
+    auth.js validates every field →
+    saves new user to localStorage →
+    redirects to index.html to log in.
+-->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>OSS Fuzzing — Register</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Shared CSS module -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="has-video-bg">
+
+<!-- Same lock video as login page — continuous experience
+     between login ↔ register. Loops while creating a new account. -->
+<div class="video-bg-wrap">
+  <video autoplay muted loop playsinline>
+    <source src="videos/lock-bg.mp4" type="video/mp4">
+  </video>
+</div>
+<div class="video-bg-overlay"></div>
+
+<div class="card" style="max-width:500px; padding-top:36px;">
+
+  <!-- Step indicator — registration is also Step 1 -->
+  <div class="steps">
+    <div class="step-dot active"></div>
+    <div class="step-dot"></div>
+    <div class="step-dot"></div>
+  </div>
+
+  <!-- Logo -->
+  <div class="logo">
+    <div class="logo-icon">
+      <svg viewBox="0 0 20 20">
+        <path d="M10 2L3 6v8l7 4 7-4V6L10 2zm0 2.2L15.5 7 10 9.8 4.5 7 10 4.2zM4 8.5l5.5 3.1v5L4 13.5v-5zm7.5 8.1v-5L17 8.5v5l-5.5 3.1z"/>
+      </svg>
+    </div>
+    <div class="logo-text">
+      <h1>OSS Fuzzing</h1>
+      <p>Security Detection Platform</p>
+    </div>
+  </div>
+
+  <div class="heading">Create Your Account</div>
+  <div class="sub">Fill all details below to register</div>
+
+  <!-- Message boxes shown by auth.js -->
+  <div class="err" id="errMsg"></div>
+  <div class="suc" id="sucMsg"></div>
+
+  <!-- FIRST NAME + LAST NAME — two columns side by side -->
+  <div class="form-row">
+    <div class="fg">
+      <label for="firstName">First Name</label>
+      <!-- type="text" = accepts any text characters -->
+      <input type="text" id="firstName" placeholder="e.g. Akhil" autocomplete="given-name">
+    </div>
+    <div class="fg">
+      <label for="lastName">Last Name</label>
+      <input type="text" id="lastName" placeholder="e.g. Kudikudi" autocomplete="family-name">
+    </div>
+  </div>
+
+  <!-- FULL NAME -->
+  <div class="fg">
+    <label for="fullName">Full Name</label>
+    <input type="text" id="fullName" placeholder="e.g. Kudikudi Akhil" autocomplete="name">
+  </div>
+
+  <!-- EMAIL
+       type="email" = browser validates @ and dot format automatically -->
+  <div class="fg">
+    <label for="email">Email Address</label>
+    <input type="email" id="email" placeholder="e.g. akhil@example.com" autocomplete="email">
+  </div>
+
+  <!-- PHONE NUMBER
+       type="tel" = shows number keyboard on mobile devices.
+       maxlength="10" = limits input to 15 characters. -->
+  <div class="fg">
+    <label for="phone">Phone Number</label>
+    <input type="tel" id="phone" placeholder="e.g. 9640972107"
+           autocomplete="tel" maxlength="10">
+    <div class="hint">Enter exactly 10 digits only — no spaces or symbols. Example: 9640972107</div>
+  </div>
+
+  <!-- PASSWORD
+       oninput fires every time user types → updates strength bar.
+       checkStrength() is defined in auth.js. -->
+  <div class="fg">
+    <label for="pass">Password</label>
+    <input type="password" id="pass"
+           placeholder="Create a strong password"
+           autocomplete="new-password"
+           oninput="checkStrength()">
+    <!-- Strength bar: starts at 0%, JS updates width and colour -->
+    <div class="str-wrap"><div class="str-fill" id="strBar"></div></div>
+    <div class="str-lbl" id="strLbl">Enter a password</div>
+  </div>
+
+  <!-- CONFIRM PASSWORD
+       oninput re-runs checkStrength() to update the "match" pill. -->
+  <div class="fg">
+    <label for="pass2">Confirm Password</label>
+    <input type="password" id="pass2"
+           placeholder="Re-enter your password"
+           autocomplete="new-password"
+           oninput="checkStrength()">
+    <!-- Requirement pills: each turns green when its rule is met -->
+    <ul class="req-list">
+      <li id="req-len">Min 8 chars</li>
+      <li id="req-upper">Uppercase letter</li>
+      <li id="req-num">Contains number</li>
+      <li id="req-match">Passwords match</li>
+    </ul>
+  </div>
+
+  <!-- TERMS CHECKBOX — must be ticked to register.
+       Clicking the <label> also ticks the checkbox (linked by for/id). -->
+  <div class="cb-row">
+    <input type="checkbox" id="agree">
+    <label for="agree">
+      I confirm this account is for the OSS Fuzzing college project.
+      Account details are stored securely on the project server database.
+    </label>
+  </div>
+
+  <!-- Register button → calls doRegister() in auth.js -->
+  <button class="btn" onclick="doRegister()">Create Account &amp; Register</button>
+
+  <div class="divider"><span>ALREADY REGISTERED?</span></div>
+  <div class="link-row">Already have an account? <a href="index.html">Sign In Here</a></div>
+
+  <div class="footer">
+    KUDIKUDI AKHIL · H.T. 104324862027<br>
+    2nd MCA IV Sem · UPG College (O.U.), Siddipet<br>
+    Guide: U. RAJENDER · HOD: V. CHANDRA SHEKHAR
+  </div>
+
+</div>
+
+<!-- Load auth module — provides doRegister() and checkStrength() -->
+<script src="js/auth.js"></script>
+
+</body>
+</html>
